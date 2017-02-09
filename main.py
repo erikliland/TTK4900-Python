@@ -1,60 +1,69 @@
 import numpy as np
 import scipy.constants
-import pulp
 import time
 import pymht.tracker as tomht
 from pymht.utils.classDefinitions import Position
 import pymht.utils.radarSimulator as sim
 import pymht.utils.helpFunctions as hpf
 import pymht.models.pv as model
+import pymht.initiators.n_of_m as n_of_m
 
 
-def runSimulation(**kwargs):
-    tic = time.time()
+def runSimulation(plot=False, **kwargs):
+    minToc = [float('Inf')]
+    maxToc = [0]
+    avgToc = []
+
+    tic0 = time.time()
     seed = 5446 + 1
     # nTargets = 4
     p0 = Position(100, -100)
     radarRange = 5500.0  # meters
     meanSpeed = 10 * scipy.constants.knot  # meters/second
-    simTime = 60  # sec
+    simTime = 10 * 1  # sec
     timeStep = 60 / 24  # 24 RPM radar / 48 RPM radar
     nScans = int(simTime / timeStep)
-    lambda_phi = 1e-6  # Expected number of false measurements per unit
+    lambda_phi = 0e-6  # Expected number of false measurements per unit
     # volume of the measurement space per scan
     lambda_nu = 0.00001  # Expected number of new targets per unit volume
     # of the measurement space per scan
-    P_d = 0.9  # Probability of detection
-    N = 10  # Number of  timesteps to tail (N-scan)
+    P_d = 0.99  # Probability of detection
+    N = 13  # Number of  timesteps to tail (N-scan)
     eta2 = 5.99  # 95% confidence
     pruneThreshold = model.sigmaR_tracker
 
     # initialTargets = sim.generateInitialTargets(seed,nTargets,p0, radarRange, meanSpeed)
     initialTargets = []
     initialTargets.append(sim.SimTarget(np.array([-2000, 2000, 7, -9], dtype=np.double),
-                                        time.time(),
-                                        P_d))
-    initialTargets.append(sim.SimTarget(np.array([100,  -2000, -2, 8], dtype=np.double),
-                                        time.time(),
-                                        P_d))
-    initialTargets.append(sim.SimTarget(np.array([-4000,  200, 10, -1], dtype=np.double),
-                                        time.time(),
-                                        P_d))
-    initialTargets.append(sim.SimTarget(np.array([-4000,    0, 13, 0], dtype=np.double),
-                                        time.time(),
-                                        P_d))
+                                        time.time(), P_d))
+    initialTargets.append(sim.SimTarget(np.array([100, -2000, -2, 8], dtype=np.double),
+                                        time.time(), P_d))
+    initialTargets.append(sim.SimTarget(np.array([-4000, 200, 10, -1], dtype=np.double),
+                                        time.time(), P_d))
+    initialTargets.append(sim.SimTarget(np.array([-4000, 0, 13, 0], dtype=np.double),
+                                        time.time(), P_d))
     initialTargets.append(sim.SimTarget(np.array([-4000, -200, 17, 1], dtype=np.double),
                                         time.time(), P_d))
     initialTargets.append(sim.SimTarget(np.array([4000, -2000, 1, -8], dtype=np.double),
-                                        time.time(),
-                                        P_d))
-    initialTargets.append(sim.SimTarget(np.array([3000,  4000, 2, -8], dtype=np.double),
                                         time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([200,   5000, 10, -1], dtype=np.double),
-                                        time.time(),
-                                        P_d))
-    initialTargets.append(sim.SimTarget(np.array([-3500, -3500, 10,  5], dtype=np.double),
-                                        time.time(),
-                                        P_d))
+    initialTargets.append(sim.SimTarget(np.array([3000, 4000, 2, -8], dtype=np.double),
+                                        time.time(), P_d))
+    initialTargets.append(sim.SimTarget(np.array([200, 5000, 10, -1], dtype=np.double),
+                                        time.time(), P_d))
+    initialTargets.append(sim.SimTarget(np.array([-3500, -3500, 10, 5], dtype=np.double),
+                                        time.time(), P_d))
+    initialTargets.append(sim.SimTarget(np.array([3600, 3000, -10, 6], dtype=np.double),
+                                        time.time(), P_d))
+    initialTargets.append(sim.SimTarget(np.array([5000, 1000, -5, -1], dtype=np.double),
+                                        time.time(), P_d))
+    initialTargets.append(sim.SimTarget(np.array([2000, 100, -10, 8], dtype=np.double),
+                                        time.time(), P_d))
+    initialTargets.append(sim.SimTarget(np.array([0, -5000, 10, 2], dtype=np.double),
+                                        time.time(), P_d))
+    initialTargets.append(sim.SimTarget(np.array([-4000, 3000, 18, 0], dtype=np.double),
+                                        time.time(), P_d))
+    initialTargets.append(sim.SimTarget(np.array([-4000, 3100, 20, 0], dtype=np.double),
+                                        time.time(), P_d))
 
     # print("Initial targets:")
     # print(*initialTargets, sep='\n', end = "\n\n")
@@ -71,39 +80,54 @@ def runSimulation(**kwargs):
     tracker = tomht.Tracker(model.Phi(timeStep), model.C, model.Gamma, P_d, model.P0,
                             model.R(), model.Q(timeStep), lambda_phi, lambda_nu, eta2, N,
                             "CBC", logTime=True, period=timeStep)
-    toc = time.time() - tic
-    print("Generating simulation data runtime:", round(toc * 1000, 0), "ms")
+    initiator = n_of_m.Initiator(2,3)
+    toc0 = time.time() - tic0
+    print("Generating simulation data for {0:} targets for {1:} time steps.  It took {2:.1f} ms".format(
+        len(initialTargets), nScans, toc0 * 1000))
+
     # print("Scan list:")
     # print(*scanList, sep = "\n", end = "\n\n")
-    tic2 = time.time()
+    tic1 = time.time()
     tomht._setHighPriority()
 
-    def simulate(tracker, initialTargets, scanList):
+    def simulate(tracker, initialTargets, scanList, minToc, maxToc, avgToc):
         for index, initialTarget in enumerate(initialTargets):
             tracker.initiateTarget(initialTarget)
         for scanIndex, measurementList in enumerate(scanList):
+            tic = time.time()
             tracker.addMeasurementList(measurementList, printTime=True, **kwargs)
-            # if scanIndex == 1:
-            #     break
+            toc = time.time() - tic
+            minToc[0] = toc if toc < minToc[0] else minToc[0]
+            maxToc[0] = toc if toc > maxToc[0] else maxToc[0]
+            avgToc.append(toc)
         print("#" * 100)
 
     if False:
-        from timeit import default_timer as timer
+        # from timeit import default_timer as timer
         import cProfile
         import pstats
-        cProfile.runctx("simulate(tracker,initialTargets,scanList)",
+        cProfile.runctx("simulate(tracker,initialTargets,scanList, minToc, maxToc, avgToc)",
                         globals(), locals(), 'mainProfile.prof')
         p = pstats.Stats('mainProfile.prof')
         p.strip_dirs().sort_stats('time').print_stats(20)
         p.strip_dirs().sort_stats('cumulative').print_stats(10)
     else:
-        simulate(tracker, initialTargets, scanList)
+        for scanIndex, measurementList in enumerate(scanList):
+            print(scanIndex, initiator.processMeasurements(measurementList))
+            if scanIndex == 1:
+                break
+        # simulate(tracker, initialTargets, scanList, minToc, maxToc, avgToc)
 
     # tracker.printTargetList()
     # association = hpf.backtrackMeasurementsIndices(tracker.__trackNodes__)
     # print("Association",*association, sep = "\n")
 
-    if kwargs.get("plot", False):
+    toc1 = time.time() - tic1
+
+    print('Completed {0:} scans in {1:.0f} seconds. Min {2:4.1f} ms Avg {3:4.1f} ms Max {4:4.1f} ms'.format(
+        nScans, toc1, minToc[0] * 1000, np.average(avgToc) * 1000, maxToc[0] * 1000))
+
+    if plot:
         import matplotlib.pyplot as plt
         import matplotlib.cm as cm
         import itertools
@@ -118,11 +142,10 @@ def runSimulation(**kwargs):
         tracker.plotInitialTargets()
         # tracker.plotVelocityArrowForTrack()
         # tracker.plotValidationRegionFromRoot()
-        tracker.plotValidationRegionFromTracks()
         tracker.plotLastScan()
-        tracker.plotMeasurementsFromRoot(dummy=False, includeHistory=True)
+        # tracker.plotMeasurementsFromRoot(dummy=False, includeHistory=True)
         # tracker.plotMeasurementsFromTracks(labels = False, dummy = False)
-        tracker.plotHypothesesTrack(colors=colors3)
+        # tracker.plotHypothesesTrack(colors=colors3) # SLOW!
         tracker.plotActiveTracks(colors=colors2)
         hpf.plotTrueTrack(simList, colors=colors1, markevery=10)
         plt.axis("equal")
@@ -130,10 +153,14 @@ def runSimulation(**kwargs):
         plt.ylim((p0.y() - radarRange * 1.05, p0.y() + radarRange * 1.05))
         fig1.canvas.draw()
         plt.show(block=True)
-    toc2 = time.time() - tic2
-    print('Completed in {:.0f} seconds'.format(toc2))
+
+
 if __name__ == '__main__':
     import argparse
+    import sys
+
+    print(sys.version)
+
     parser = argparse.ArgumentParser(description="Run MHT tracker",
                                      argument_default=argparse.SUPPRESS)
     parser.add_argument('-R', help="Run recursive", action='store_true')
