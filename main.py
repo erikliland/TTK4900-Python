@@ -2,11 +2,10 @@ import numpy as np
 import scipy.constants
 import time
 import pymht.tracker as tomht
-from pymht.utils.classDefinitions import Position
+from pymht.utils.classDefinitions import Position, TempTarget
 import pymht.utils.radarSimulator as sim
 import pymht.utils.helpFunctions as hpf
 import pymht.models.pv as model
-import pymht.initiators.n_of_m as n_of_m
 
 
 def runSimulation(plot=False, **kwargs):
@@ -17,53 +16,54 @@ def runSimulation(plot=False, **kwargs):
     tic0 = time.time()
     seed = 5446 + 1
     # nTargets = 4
-    p0 = Position(100, -100)
+    p0 = Position(100., -100.)
     radarRange = 5500.0  # meters
-    meanSpeed = 10 * scipy.constants.knot  # meters/second
-    simTime = 10 * 1  # sec
-    timeStep = 60 / 24  # 24 RPM radar / 48 RPM radar
+    meanSpeed = 10.0 * scipy.constants.knot  # meters/second
+    maxSpeed = 21.0  # meters / second
+    timeStep = 60. / 24.  # 24 RPM radar / 48 RPM radar
+    simTime = timeStep*16 # sec
     nScans = int(simTime / timeStep)
-    lambda_phi = 0e-6  # Expected number of false measurements per unit
+    lambda_phi = 1e-6  # Expected number of false measurements per unit
     # volume of the measurement space per scan
-    lambda_nu = 0.00001  # Expected number of new targets per unit volume
+    lambda_nu = 0.0001  # Expected number of new targets per unit volume
     # of the measurement space per scan
     P_d = 0.99  # Probability of detection
-    N = 13  # Number of  timesteps to tail (N-scan)
+    N = 9  # Number of  timesteps to tail (N-scan)
     eta2 = 5.99  # 95% confidence
     pruneThreshold = model.sigmaR_tracker
 
     # initialTargets = sim.generateInitialTargets(seed,nTargets,p0, radarRange, meanSpeed)
     initialTargets = []
-    initialTargets.append(sim.SimTarget(np.array([-2000, 2000, 7, -9], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([100, -2000, -2, 8], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([-4000, 200, 10, -1], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([-4000, 0, 13, 0], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([-4000, -200, 17, 1], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([4000, -2000, 1, -8], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([3000, 4000, 2, -8], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([200, 5000, 10, -1], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([-3500, -3500, 10, 5], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([3600, 3000, -10, 6], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([5000, 1000, -5, -1], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([2000, 100, -10, 8], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([0, -5000, 10, 2], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([-4000, 3000, 18, 0], dtype=np.double),
-                                        time.time(), P_d))
-    initialTargets.append(sim.SimTarget(np.array([-4000, 3100, 20, 0], dtype=np.double),
-                                        time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([-2000, 2100, 4, -4], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([100, -2000, -2, 8], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([-4000, 300, 10, -1], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([-4000, 0, 13, 0], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([-4000, -200, 17, 1], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([4000, -2000, 1, -8], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([3000, 4000, 2, -8], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([200, 5000, 10, -1], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([-3500, -3500, 10, 5], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([-4100, 3200, 19, 2], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([3600, 3000, -10, 3], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([5000, 1000, -5, -1], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([2000, 100, -10, 8], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([0, -5000, 10, 2], dtype=np.double),
+                                     time.time(), P_d))
+    initialTargets.append(TempTarget(np.array([-4000, 3000, 17, 0], dtype=np.double),
+                                     time.time(), P_d))
 
     # print("Initial targets:")
     # print(*initialTargets, sep='\n', end = "\n\n")
@@ -75,12 +75,18 @@ def runSimulation(plot=False, **kwargs):
     # sim.writeSimList(initialTargets, simList, "parallel_targets_0.5Hz.txt")
 
     scanList = sim.simulateScans(seed, simList, model.C, model.R(model.sigmaR_true),
-                                 lambda_phi, radarRange, p0, shuffle=False)
+                                 lambda_phi, radarRange, p0,
+                                 shuffle=True,
+                                 localClutter = True,
+                                 globalClutter = False,
+                                 debug = False)
     # solvers: CPLEX, GLPK, CBC, GUROBI
     tracker = tomht.Tracker(model.Phi(timeStep), model.C, model.Gamma, P_d, model.P0,
                             model.R(), model.Q(timeStep), lambda_phi, lambda_nu, eta2, N,
-                            "CBC", logTime=True, period=timeStep)
-    initiator = n_of_m.Initiator(2,3)
+                            p0, radarRange, "CBC",
+                            logTime=True,
+                            period=timeStep,
+                            checkIntegrity=False)
     toc0 = time.time() - tic0
     print("Generating simulation data for {0:} targets for {1:} time steps.  It took {2:.1f} ms".format(
         len(initialTargets), nScans, toc0 * 1000))
@@ -90,19 +96,22 @@ def runSimulation(plot=False, **kwargs):
     tic1 = time.time()
     tomht._setHighPriority()
 
-    def simulate(tracker, initialTargets, scanList, minToc, maxToc, avgToc):
-        for index, initialTarget in enumerate(initialTargets):
-            tracker.initiateTarget(initialTarget)
+    def simulate(tracker, initialTargets, scanList, minToc, maxToc, avgToc, **kwargs):
+        print("#" * 100)
+        if kwargs.get('preInitiate', False):
+            for index, initialTarget in enumerate(initialTargets):
+                tracker.initiateTarget(initialTarget)
         for scanIndex, measurementList in enumerate(scanList):
             tic = time.time()
             tracker.addMeasurementList(measurementList, printTime=True, **kwargs)
+
             toc = time.time() - tic
             minToc[0] = toc if toc < minToc[0] else minToc[0]
             maxToc[0] = toc if toc > maxToc[0] else maxToc[0]
             avgToc.append(toc)
         print("#" * 100)
 
-    if False:
+    if True:
         # from timeit import default_timer as timer
         import cProfile
         import pstats
@@ -112,11 +121,7 @@ def runSimulation(plot=False, **kwargs):
         p.strip_dirs().sort_stats('time').print_stats(20)
         p.strip_dirs().sort_stats('cumulative').print_stats(10)
     else:
-        for scanIndex, measurementList in enumerate(scanList):
-            print(scanIndex, initiator.processMeasurements(measurementList))
-            if scanIndex == 1:
-                break
-        # simulate(tracker, initialTargets, scanList, minToc, maxToc, avgToc)
+        simulate(tracker, initialTargets, scanList, minToc, maxToc, avgToc, )
 
     # tracker.printTargetList()
     # association = hpf.backtrackMeasurementsIndices(tracker.__trackNodes__)
@@ -132,27 +137,31 @@ def runSimulation(plot=False, **kwargs):
         import matplotlib.cm as cm
         import itertools
         colors1 = itertools.cycle(cm.rainbow(
-            np.linspace(0, 1, len(tracker.__targetList__))))
+            np.linspace(0, 1, len(initialTargets))))
         colors2 = itertools.cycle(cm.rainbow(
             np.linspace(0, 1, len(tracker.__targetList__))))
         colors3 = itertools.cycle(cm.rainbow(
             np.linspace(0, 1, len(tracker.__targetList__))))
         fig1 = plt.figure(num=1, figsize=(9, 9), dpi=100)
         hpf.plotRadarOutline(p0, radarRange, center=False)
-        tracker.plotInitialTargets()
+        # tracker.plotInitialTargets()
         # tracker.plotVelocityArrowForTrack()
         # tracker.plotValidationRegionFromRoot()
+        tracker.plotMeasurementsFromRoot(dummy=True, includeHistory=False)
+        desiredPlotPeriod = 4.0
+        markEvery = max(1, int(timeStep / desiredPlotPeriod))
+        hpf.plotTrueTrack(simList, colors=colors1, markevery=markEvery)
+        # tracker.plotMeasurementsFromTracks(labels = False, dummy = True)
         tracker.plotLastScan()
-        # tracker.plotMeasurementsFromRoot(dummy=False, includeHistory=True)
-        # tracker.plotMeasurementsFromTracks(labels = False, dummy = False)
-        # tracker.plotHypothesesTrack(colors=colors3) # SLOW!
-        tracker.plotActiveTracks(colors=colors2)
-        hpf.plotTrueTrack(simList, colors=colors1, markevery=10)
+        # tracker.plotAllScans()
+        tracker.plotHypothesesTrack(colors=colors3)  # SLOW!
+        tracker.plotActiveTracks(colors=colors2, markInitial=True)
+        tracker.plotTerminatedTracks()
         plt.axis("equal")
         plt.xlim((p0.x() - radarRange * 1.05, p0.x() + radarRange * 1.05))
         plt.ylim((p0.y() - radarRange * 1.05, p0.y() + radarRange * 1.05))
         fig1.canvas.draw()
-        plt.show(block=True)
+        plt.show()
 
 
 if __name__ == '__main__':
