@@ -1,5 +1,5 @@
 import numpy as np
-import scipy.constants
+# import scipy.constants
 import time
 import pymht.tracker as tomht
 from pymht.utils.classDefinitions import Position, TempTarget
@@ -15,23 +15,23 @@ def runSimulation(plot=False, **kwargs):
 
     tic0 = time.time()
     seed = 5446 + 1
-    # nTargets = 4
     p0 = Position(100., -100.)
     radarRange = 5500.0  # meters
-    meanSpeed = 10.0 * scipy.constants.knot  # meters/second
     maxSpeed = 21.0  # meters / second
     timeStep = 60. / 24.  # 24 RPM radar / 48 RPM radar
-    simTime = timeStep*16 # sec
+    simTime = 60*2  # sec
     nScans = int(simTime / timeStep)
     lambda_phi = 1e-6  # Expected number of false measurements per unit
     # volume of the measurement space per scan
-    lambda_nu = 0.0001  # Expected number of new targets per unit volume
+    lambda_nu = 0.0002  # Expected number of new targets per unit volume
     # of the measurement space per scan
-    P_d = 0.99  # Probability of detection
+    P_d = 0.9  # Probability of detection
     N = 9  # Number of  timesteps to tail (N-scan)
     eta2 = 5.99  # 95% confidence
     pruneThreshold = model.sigmaR_tracker
 
+    # nTargets = 4
+    # meanSpeed = 10.0 * scipy.constants.knot  # meters/second
     # initialTargets = sim.generateInitialTargets(seed,nTargets,p0, radarRange, meanSpeed)
     initialTargets = []
     initialTargets.append(TempTarget(np.array([-2000, 2100, 4, -4], dtype=np.double),
@@ -65,22 +65,24 @@ def runSimulation(plot=False, **kwargs):
     initialTargets.append(TempTarget(np.array([-4000, 3000, 17, 0], dtype=np.double),
                                      time.time(), P_d))
 
-    # print("Initial targets:")
-    # print(*initialTargets, sep='\n', end = "\n\n")
+    if kwargs.get('printInitialTargets', False):
+        print("Initial targets:")
+        print(*initialTargets, sep='\n', end="\n\n")
 
     simList = sim.simulateTargets(seed, initialTargets, nScans, timeStep, model.Phi(
         timeStep), model.Q(timeStep, model.sigmaQ_true), model.Gamma)
-    # print("Sim list:")
-    # print(*simList, sep = "\n", end = "\n\n")
-    # sim.writeSimList(initialTargets, simList, "parallel_targets_0.5Hz.txt")
+
+    if kwargs.get('printSimList', False):
+        print("Sim list:")
+        print(*simList, sep="\n", end="\n\n")
 
     scanList = sim.simulateScans(seed, simList, model.C, model.R(model.sigmaR_true),
                                  lambda_phi, radarRange, p0,
                                  shuffle=True,
-                                 localClutter = True,
-                                 globalClutter = False,
-                                 debug = False)
-    # solvers: CPLEX, GLPK, CBC, GUROBI
+                                 localClutter=True,
+                                 globalClutter=True,
+                                 debug=False)
+
     tracker = tomht.Tracker(model.Phi(timeStep), model.C, model.Gamma, P_d, model.P0,
                             model.R(), model.Q(timeStep), lambda_phi, lambda_nu, eta2, N,
                             p0, radarRange, "CBC",
@@ -91,8 +93,10 @@ def runSimulation(plot=False, **kwargs):
     print("Generating simulation data for {0:} targets for {1:} time steps.  It took {2:.1f} ms".format(
         len(initialTargets), nScans, toc0 * 1000))
 
-    # print("Scan list:")
-    # print(*scanList, sep = "\n", end = "\n\n")
+    if kwargs.get('printScanList', False):
+        print("Scan list:")
+        print(*scanList, sep="\n", end="\n\n")
+
     tic1 = time.time()
     tomht._setHighPriority()
 
@@ -111,8 +115,7 @@ def runSimulation(plot=False, **kwargs):
             avgToc.append(toc)
         print("#" * 100)
 
-    if True:
-        # from timeit import default_timer as timer
+    if kwargs.get('profile', False):
         import cProfile
         import pstats
         cProfile.runctx("simulate(tracker,initialTargets,scanList, minToc, maxToc, avgToc)",
@@ -123,9 +126,12 @@ def runSimulation(plot=False, **kwargs):
     else:
         simulate(tracker, initialTargets, scanList, minToc, maxToc, avgToc, )
 
-    # tracker.printTargetList()
-    # association = hpf.backtrackMeasurementsIndices(tracker.__trackNodes__)
-    # print("Association",*association, sep = "\n")
+    if kwargs.get('printTargetList', False):
+        tracker.printTargetList()
+
+    if kwargs.get('printAssociation', False):
+        association = hpf.backtrackMeasurementsIndices(tracker.__trackNodes__)
+        print("Association", *association, sep="\n")
 
     toc1 = time.time() - tic1
 
@@ -143,18 +149,19 @@ def runSimulation(plot=False, **kwargs):
         colors3 = itertools.cycle(cm.rainbow(
             np.linspace(0, 1, len(tracker.__targetList__))))
         fig1 = plt.figure(num=1, figsize=(9, 9), dpi=100)
-        hpf.plotRadarOutline(p0, radarRange, center=False)
+        hpf.plotRadarOutline(p0, radarRange, markCenter=False)
         # tracker.plotInitialTargets()
         # tracker.plotVelocityArrowForTrack()
-        # tracker.plotValidationRegionFromRoot()
-        tracker.plotMeasurementsFromRoot(dummy=True, includeHistory=False)
+        # tracker.plotValidationRegionFromRoot() # TODO: Does not work
+        # tracker.plotValidationRegionFromTracks() # TODO: Does not work
+        # tracker.plotMeasurementsFromRoot(dummy=False, includeHistory=False)
         desiredPlotPeriod = 4.0
         markEvery = max(1, int(timeStep / desiredPlotPeriod))
         hpf.plotTrueTrack(simList, colors=colors1, markevery=markEvery)
-        # tracker.plotMeasurementsFromTracks(labels = False, dummy = True)
-        tracker.plotLastScan()
+        # tracker.plotMeasurementsFromTracks(labels = False, dummy = True, real = False)
+        # tracker.plotLastScan()
         # tracker.plotAllScans()
-        tracker.plotHypothesesTrack(colors=colors3)  # SLOW!
+        # tracker.plotHypothesesTrack(colors=colors3)  # SLOW!
         tracker.plotActiveTracks(colors=colors2, markInitial=True)
         tracker.plotTerminatedTracks()
         plt.axis("equal")
@@ -174,5 +181,5 @@ if __name__ == '__main__':
                                      argument_default=argparse.SUPPRESS)
     parser.add_argument('-R', help="Run recursive", action='store_true')
     args = vars(parser.parse_args())
-    runSimulation(plot=False, **args)
+    runSimulation(plot=True, profile=False, **args)
     print("-" * 100)
