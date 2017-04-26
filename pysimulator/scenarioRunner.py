@@ -7,35 +7,38 @@ import os
 import datetime
 
 
-def runVariations(scenario, path, pdList, lambdaphiList, nList, nMonteCarlo):
+def runVariations(scenario, path, pdList, lambdaphiList, nList, nMonteCarlo, **kwargs):
     simList = scenario.getSimList()
-    scenarioElement = ET.Element(scenarioTag)
+    scenarioElement = ET.Element(scenarioTag, attrib={nameTag:scenario.name})
     simList.storeGroundTruth(scenarioElement)
     scenario.storeScenarioSettings(scenarioElement)
-    variationsElement = ET.SubElement(scenarioElement, variationsTag)
-    for P_d in pdList:
-        for lambda_phi in lambdaphiList:
-            for N in nList:
-                variationDict ={'P_d':P_d,
-                                'lambda_phi':lambda_phi,
-                                'N':N}
-                variationElement = ET.SubElement(variationsElement, variationTag,
-                                                 attrib={str(k):str(v) for k,v in variationDict.items()})
-                runMonteCarloSimulations(variationElement,scenario,simList,nMonteCarlo,variationDict)
-    if os.path.exists(path):
-        modTime = os.path.getctime(path)
-        timeString = datetime.datetime.fromtimestamp(modTime).strftime("%d.%m.%Y %H.%M")
-        head, tail = os.path.split(path)
-        newPath = os.path.join(head,tail+"_"+timeString)
-        os.rename(path, newPath)
-        print(newPath)
+    for preInitialized in [False, True]:
+        variationsElement = ET.SubElement(scenarioElement,
+                                          variationsTag,
+                                          attrib={preinitializedTag:str(preInitialized)})
+        for P_d in pdList:
+            for lambda_phi in lambdaphiList:
+                for N in nList:
+                    variationDict ={'P_d':P_d,
+                                    'lambda_phi':lambda_phi,
+                                    'N':N}
+                    variationElement = ET.SubElement(variationsElement, variationTag,
+                                                     attrib={str(k):str(v) for k,v in variationDict.items()})
+                    runMonteCarloSimulations(variationElement,scenario,simList,nMonteCarlo,variationDict,preInitialized, **kwargs)
+
+    _renameOldFiles(path)
     hpf.writeElementToFile(path, scenarioElement)
 
-def runMonteCarloSimulations(variationElement, scenario, simList, nSim, variationDict):
-    # nCores = min(max(1, kwargs.get("c", os.cpu_count() - 1)), os.cpu_count())
-    # pool = mp.Pool(nCores, initWorker)
-    # results = pool.imap_unordered(functools.partial(runSimulation, sArgs), iIter, 1)
+def _renameOldFiles(path):
+    if os.path.exists(path):
+        modTime = os.path.getmtime(path)
+        timeString = datetime.datetime.fromtimestamp(modTime).strftime("%d.%m.%Y %H.%M")
+        head, tail = os.path.split(path)
+        filename, extension = os.path.splitext(tail)
+        newPath = os.path.join(head,filename+"_"+timeString+extension)
+        os.rename(path, newPath)
 
+def runMonteCarloSimulations(variationElement, scenario, simList, nSim, variationDict, preInitialized, **kwargs):
     P_d = variationDict['P_d']
     lambda_phi = variationDict['lambda_phi']
     N = variationDict['N']
@@ -56,22 +59,39 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, variatio
 
     storeTrackerData(variationElement, trackerArgs, trackerKwargs)
     for i in range(nSim):
-        print("Running scenario iteration", i, end="", flush=True)
+        if kwargs.get('printLog', True):
+            print("Running scenario iteration", i, end="", flush=True)
         seed = 5446 + i
         scanList, aisList = scenario.getSimulatedScenario(seed, simList, lambda_phi, P_d)
-        runSimulation(variationElement, simList, scanList, aisList, trackerArgs, trackerKwargs,
-                      seed=seed, markIterations=True)
 
-def runSimulation(variationElement, simList, scanList, aisList, trackerArgs, trackerKwargs, **kwargs):
-    tracker = tomht.Tracker(*trackerArgs, groundTruth=simList, **{**trackerKwargs, **kwargs})
+        try:
+            runSimulation(variationElement, simList, scanList, aisList, trackerArgs, trackerKwargs,preInitialized,
+                      seed=seed, **kwargs)
+        except Exception as e:
+            import traceback
+            print("Scenario:", scenario.name)
+            print("preInitialized", preInitialized)
+            print("variationDict", variationDict)
+            print("Iteration", i)
+            print("Seed", seed)
+            traceback.print_tb()
+            traceback.print_exception(e)
 
-    for measurementList in scanList:
+def runSimulation(variationElement, simList, scanList, aisList, trackerArgs, trackerKwargs, preInitialized, **kwargs):
+
+    tracker = tomht.Tracker(*trackerArgs, **{**trackerKwargs, **kwargs})
+
+    startIndex = 1 if preInitialized else 0
+    if preInitialized:
+        tracker.preInitialize(simList)
+
+    for measurementList in scanList[startIndex:]:
         scanTime = measurementList.time
         aisPredictions = aisList.getMeasurements(scanTime)
         tracker.addMeasurementList(measurementList, aisPredictions)
-        if kwargs.get('markIterations', False): print('.', end="", flush=True)
+        if kwargs.get('printLog', True): print('.', end="", flush=True)
     tracker._storeRun(variationElement, **kwargs)
-    if kwargs.get('markIterations'): print()
+    if kwargs.get('printLog', True): print()
 
 def storeTrackerData(variationElement, trackerArgs, trackerKwargs):
     trackersettingsElement = ET.SubElement(variationElement, trackerSettingsTag)
