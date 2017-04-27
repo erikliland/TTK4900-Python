@@ -1,10 +1,10 @@
-from pysimulator import scenarioAnalyzer
+from pysimulator import resultsPlotter
 import multiprocessing as mp
 
 def plotResults(filePathList):
     with mp.Pool() as pool:
-        pool.map(scenarioAnalyzer.analyzeFile,filePathList)
+        pool.map(resultsPlotter.plotLostTracks,filePathList)
 
 if __name__ == '__main__':
     from pysimulator.simulationConfig import filePathList
-    analyseResults(filePathList[0:2])
+    plotResults(filePathList[0:1])

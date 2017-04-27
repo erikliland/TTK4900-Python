@@ -9,7 +9,7 @@ class ScenarioBase:
     def __init__(self):
         #Static scenario data
         self.staticSeed = 5447
-        self.initTime = 0
+        self.initTime = 0.
         self.radarPeriod = 60. / 24.  # 24 RPM radar / 48 RPM radar
         self.radarRange = 5500.0  # meters
         self.simulationTimeStep = self.radarPeriod / 4  # sec
@@ -31,6 +31,8 @@ class ScenarioBase:
         for k,v in vars(self).items():
             ET.SubElement(scenariosettingsElement,str(k)).text = str(v)
 
+
+
 class Scenario(ScenarioBase):
     def __init__(self, name):
         ScenarioBase.__init__(self)
@@ -45,6 +47,7 @@ class Scenario(ScenarioBase):
 
     def __len__(self):
         return self.initialTargets.__len__()
+
 
 
 
@@ -108,56 +111,56 @@ scenario2 = Scenario("Scenario2")
 scenario2.add([-2000, 2100, 4, -4])
 scenario2.add([100, -2000, -2, 8])
 scenario2.add([-4000, 300, 12, -1])
-scenario2.add([-4000, 0, 12, 0], mmsi=257114401, aisClass='B')
+scenario2.add([-4000, 0, 12, 0], mmsi=257114401, aisClass='A')
 scenario2.add([-4000, -200, 17, 1])
 scenario2.add([4000, -2000, 1, -8])
 scenario2.add([3000, 4000, 2, -8])
 scenario2.add([200, 5000, 10, -1])
 scenario2.add([-3500, -3500, 10, 5])
-scenario2.add([-4100, 3200, 17, 2], mmsi=257114400, aisClass='B')
+scenario2.add([-4100, 3200, 17, 2], mmsi=257114400, aisClass='A')
 scenario2.add([3600, 3000, -10, 3])
 scenario2.add([5000, 1000, -7, -2])
 scenario2.add([2000, 100, -10, 8])
 scenario2.add([0, -5000, 10, 2])
-scenario2.add([-400, 300, 17, 0], mmsi=257304900, aisClass='B')
+scenario2.add([-400, 300, 17, 0], mmsi=257304900, aisClass='A')
 scenario2.add([0, 2000, 15, 15])
 
 #Scenario 3
 scenario3 = Scenario("Scenario3")
-scenario3.add([-2000, 2100, 4, -4])
-scenario3.add([100, -2000, -2, 8])
-scenario3.add([-4000, 300, 12, -1])
-scenario3.add([-4000, 0, 12, 0], mmsi=257114401, aisClass='B')
-scenario3.add([-4000, -200, 17, 1])
-scenario3.add([4000, -2000, 1, -8])
-scenario3.add([3000, 4000, 2, -8])
-scenario3.add([200, 5000, 10, -1])
-scenario3.add([-3500, -3500, 10, 5])
-scenario3.add([-4100, 3200, 17, 2], mmsi=257114400, aisClass='B')
-scenario3.add([3600, 3000, -10, 3])
-scenario3.add([5000, 1000, -7, -2])
-scenario3.add([2000, 100, -10, 8])
-scenario3.add([0, -5000, 10, 2])
-scenario3.add([-400, 300, 17, 0], mmsi=257304900, aisClass='B')
-scenario3.add([0, 2000, 15, 15])
+scenario3.add([-2000, 2100, 4, -4], mmsi=257114400, aisClass='B')
+scenario3.add([100, -2000, -2, 8], mmsi=257114401, aisClass='B')
+scenario3.add([-4000, 300, 12, -1], mmsi=257114402, aisClass='B')
+scenario3.add([-4000, 0, 12, 0], mmsi=257114403, aisClass='B')
+scenario3.add([-4000, -200, 17, 1], mmsi=257114404, aisClass='B')
+scenario3.add([4000, -2000, 1, -8], mmsi=257114405, aisClass='B')
+scenario3.add([3000, 4000, 2, -8], mmsi=257114406, aisClass='B')
+scenario3.add([200, 5000, 10, -1], mmsi=257114407, aisClass='B')
+scenario3.add([-3500, -3500, 10, 5], mmsi=257114408, aisClass='B')
+scenario3.add([-4100, 3200, 17, 2], mmsi=257114409, aisClass='B')
+scenario3.add([3600, 3000, -10, 3], mmsi=257114410, aisClass='B')
+scenario3.add([5000, 1000, -7, -2], mmsi=257114411, aisClass='B')
+scenario3.add([2000, 100, -10, 8], mmsi=257114412, aisClass='B')
+scenario3.add([0, -5000, 10, 2], mmsi=257114413, aisClass='B')
+scenario3.add([-400, 300, 17, 0], mmsi=257304914, aisClass='B')
+scenario3.add([0, 2000, 15, 15], mmsi=257114415, aisClass='B')
 
 #Scenario 4
 scenario4 = Scenario("Scenario4")
-scenario4.add([-2000, 2100, 4, -4])
-scenario4.add([100, -2000, -2, 8])
-scenario4.add([-4000, 300, 12, -1])
-scenario4.add([-4000, 0, 12, 0], mmsi=257114401, aisClass='B')
-scenario4.add([-4000, -200, 17, 1])
-scenario4.add([4000, -2000, 1, -8])
-scenario4.add([3000, 4000, 2, -8])
-scenario4.add([200, 5000, 10, -1])
-scenario4.add([-3500, -3500, 10, 5])
-scenario4.add([-4100, 3200, 17, 2], mmsi=257114400, aisClass='B')
-scenario4.add([3600, 3000, -10, 3])
-scenario4.add([5000, 1000, -7, -2])
-scenario4.add([2000, 100, -10, 8])
-scenario4.add([0, -5000, 10, 2])
-scenario4.add([-400, 300, 17, 0], mmsi=257304900, aisClass='B')
-scenario4.add([0, 2000, 15, 15])
+scenario4.add([-2000, 2100, 4, -4], mmsi=257114400, aisClass='A')
+scenario4.add([100, -2000, -2, 8], mmsi=257114401, aisClass='A')
+scenario4.add([-4000, 300, 12, -1], mmsi=257114402, aisClass='A')
+scenario4.add([-4000, 0, 12, 0], mmsi=257114403, aisClass='A')
+scenario4.add([-4000, -200, 17, 1], mmsi=257114404, aisClass='A')
+scenario4.add([4000, -2000, 1, -8], mmsi=257114405, aisClass='A')
+scenario4.add([3000, 4000, 2, -8], mmsi=257114406, aisClass='A')
+scenario4.add([200, 5000, 10, -1], mmsi=257114407, aisClass='A')
+scenario4.add([-3500, -3500, 10, 5], mmsi=257114408, aisClass='A')
+scenario4.add([-4100, 3200, 17, 2], mmsi=257114409, aisClass='A')
+scenario4.add([3600, 3000, -10, 3], mmsi=257114410, aisClass='A')
+scenario4.add([5000, 1000, -7, -2], mmsi=257114411, aisClass='A')
+scenario4.add([2000, 100, -10, 8], mmsi=257114412, aisClass='A')
+scenario4.add([0, -5000, 10, 2], mmsi=257114413, aisClass='A')
+scenario4.add([-400, 300, 17, 0], mmsi=257304914, aisClass='A')
+scenario4.add([0, 2000, 15, 15], mmsi=257114415, aisClass='A')
 
 scenarioList = [scenario1, scenario2, scenario3, scenario4]

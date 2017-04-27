@@ -4,7 +4,7 @@ import numpy as np
 
 
 def analyzeFile(filePath):
-    print("File:", filePath)
+    print("Starting:", filePath)
     tree = ET.parse(filePath)
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
@@ -16,21 +16,23 @@ def analyzeFile(filePath):
     for variationsElement in variationsList:
         analyzeVariations(groundtruthList, variationsElement)
     tree.write(filePath)
+    print("Done:", filePath)
 
 def analyzeVariations(groundtruthList, variationsElement):
     preInitialized = variationsElement.get(preinitializedTag)
-    print("preInitialized", preInitialized)
+    # print("preInitialized", preInitialized)
 
     if preInitialized == "True":
-        print("Analyzing tracking")
+        # print("Analyzing tracking")
         analyzeVariationsTrackingPerformance(groundtruthList, variationsElement)
     else:
-        print("Analyzing initialization")
+        # print("Analyzing initialization")
         analyzeVariationsInitializationPerformance(groundtruthList, variationsElement)
 
 def analyzeVariationsTrackingPerformance(groundtruthList, variationsElement):
     variationList = variationsElement.findall(variationTag)
     for variation in variationList:
+        analyzeVariationTrackLossPerformance(groundtruthList, variation)
         analyzeVariationTrackingPerformance(groundtruthList, variation)
 
 def analyzeVariationsInitializationPerformance(groundtruthList, variationsElement):
@@ -39,18 +41,24 @@ def analyzeVariationsInitializationPerformance(groundtruthList, variationsElemen
     for variation in variationList:
         analyzeVariationInitializationPerformance(groundtruthList, variation)
 
-def analyzeVariationTrackingPerformance(truetrackList, variation):
-    print("nTrueTracks", len(truetrackList))
+def analyzeVariationTrackLossPerformance(groundtruthList, variation):
     runList = variation.findall(runTag)
-    for run in runList[0:1]:
+    for run in runList:
         estimateTrackList = run.findall(trackTag)
-        print("Run iterations", run.get(iterationTag))
-        print("nEstTracks", len(estimateTrackList))
+
+
+def analyzeVariationTrackingPerformance(truetrackList, variation):
+    runList = variation.findall(runTag)
+    for run in runList:
+        estimateTrackList = run.findall(trackTag)
         for smoothed in [False, True]:
-            matchList = matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, smoothed)
-            storeMatchList(run, matchList, smoothed)
-
-
+            try:
+                matchList = matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, smoothed)
+                storeMatchList(run, matchList, smoothed)
+            except AssertionError as e:
+                print(variation.attrib)
+                print(run.attrib)
+                raise e
 
 def analyzeVariationInitializationPerformance(groundtruthList, variation):
     pass
@@ -72,18 +80,22 @@ def matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, smoothed, thr
             trueTrackSlice = [s for s in trueTrackStateList if s.get(timeTag) in timeMatch]
             estimatedTrackSlice = [s for s in estimatedStateList if s.get(timeTag) in timeMatch]
             assert len(timeMatch) == len(trueTrackSlice) == len(estimatedTrackSlice)
+
             delta2List = []
             for trueState, estimatedState in zip(trueTrackSlice, estimatedTrackSlice):
                 trueTrackPosition = _parsePosition(trueState.find(positionTag))
                 estimatedTrackPosition = _parsePosition(estimatedState.find(positionTag))
+                if any([np.isnan(p) for p in estimatedTrackPosition]):
+                    continue
                 delta = trueTrackPosition - estimatedTrackPosition
                 deltaNorm = np.linalg.norm(delta)
                 deltaNorm2 = deltaNorm**2
                 delta2List.append(deltaNorm2)
-            assert len(timeMatch) == len(delta2List)
+            if len(timeMatch) != len(delta2List):
+                del estimatedTrack
+                continue
             meanSquaredError = np.mean(delta2List)
-            assert meanSquaredError > 0.
-
+            assert meanSquaredError > 0., str(meanSquaredError)+str(delta2List)+estimatedTrackID
             approvedMatch = all([math.sqrt(d2) < threshold for d2 in delta2List])
 
             if approvedMatch:

@@ -7,24 +7,24 @@ import os
 import datetime
 
 
-def runVariations(scenario, path, pdList, lambdaphiList, nList, nMonteCarlo, **kwargs):
+def runVariations(scenario, path, pdList, lambdaphiList, nList, nMonteCarlo, baseSeed, **kwargs):
     simList = scenario.getSimList()
     scenarioElement = ET.Element(scenarioTag, attrib={nameTag:scenario.name})
-    simList.storeGroundTruth(scenarioElement)
+    simList.storeGroundTruth(scenarioElement, scenario)
     scenario.storeScenarioSettings(scenarioElement)
-    for preInitialized in [False, True]:
+    for preInitialized in [True]:
         variationsElement = ET.SubElement(scenarioElement,
                                           variationsTag,
                                           attrib={preinitializedTag:str(preInitialized)})
         for P_d in pdList:
             for lambda_phi in lambdaphiList:
                 for N in nList:
-                    variationDict ={'P_d':P_d,
-                                    'lambda_phi':lambda_phi,
-                                    'N':N}
+                    variationDict ={pdTag:P_d,
+                                    lambdaphiTag:lambda_phi,
+                                    nTag:N}
                     variationElement = ET.SubElement(variationsElement, variationTag,
                                                      attrib={str(k):str(v) for k,v in variationDict.items()})
-                    runMonteCarloSimulations(variationElement,scenario,simList,nMonteCarlo,variationDict,preInitialized, **kwargs)
+                    runMonteCarloSimulations(variationElement,scenario,simList,nMonteCarlo, baseSeed, variationDict,preInitialized, **kwargs)
 
     _renameOldFiles(path)
     hpf.writeElementToFile(path, scenarioElement)
@@ -38,10 +38,10 @@ def _renameOldFiles(path):
         newPath = os.path.join(head,filename+"_"+timeString+extension)
         os.rename(path, newPath)
 
-def runMonteCarloSimulations(variationElement, scenario, simList, nSim, variationDict, preInitialized, **kwargs):
-    P_d = variationDict['P_d']
-    lambda_phi = variationDict['lambda_phi']
-    N = variationDict['N']
+def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed, variationDict, preInitialized, **kwargs):
+    P_d = variationDict[pdTag]
+    lambda_phi = variationDict[lambdaphiTag]
+    N = variationDict[nTag]
 
     trackerArgs = (scenario.model,
                    scenario.radarPeriod,
@@ -61,7 +61,7 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, variatio
     for i in range(nSim):
         if kwargs.get('printLog', True):
             print("Running scenario iteration", i, end="", flush=True)
-        seed = 5446 + i
+        seed = baseSeed + i
         scanList, aisList = scenario.getSimulatedScenario(seed, simList, lambda_phi, P_d)
 
         try:
@@ -74,8 +74,8 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, variatio
             print("variationDict", variationDict)
             print("Iteration", i)
             print("Seed", seed)
-            traceback.print_tb()
-            traceback.print_exception(e)
+            # traceback.print_tb()
+            # traceback.print_exception(e)
 
 def runSimulation(variationElement, simList, scanList, aisList, trackerArgs, trackerKwargs, preInitialized, **kwargs):
 

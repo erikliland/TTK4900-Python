@@ -16,7 +16,7 @@ def runSimulation(**kwargs):
     avgToc = []
     tic0 = time.time()
     #
-    seed = 5446 + 1
+    seed = simulationConfig.baseSeed + 7
     # p0 = np.array([100., -100.])
     # radarRange = 5500.0  # meters
     # maxSpeed = 22.0  # meters / second
@@ -27,10 +27,10 @@ def runSimulation(**kwargs):
     # simTime = radarPeriod * 30  # sec
     # nScans = int(simTime / radarPeriod)
     # nSimulationSteps = int(simTime / simulationTimeStep)
-    lambda_phi = 1e-6
+    lambda_phi = 4e-6
     # lambda_nu = 0.0002
-    P_d = 0.8  # Probability of detection
-    # N = 6  # Number of  timesteps to tail (N-scan)
+    P_d = 0.5  # Probability of detection
+    N = 1  # Number of  timesteps to tail (N-scan)
     # eta2 = 5.99  # 95% confidence
     #
     # assert simulationTimeStep <= radarPeriod
@@ -63,7 +63,7 @@ def runSimulation(**kwargs):
     #                                 mmsi=257304900, aisClass='B', probabilityOfReceive=P_r))
     # initialTargets.append(SimTarget([0, 2000, 15, 15], initTime, P_d, model.sigmaQ_true))
 
-    scenario = simulationConfig.scenarioList[0]
+    scenario = simulationConfig.scenarioList[3]
 
 
     if kwargs.get('printInitialTargets', False):
@@ -108,7 +108,7 @@ def runSimulation(**kwargs):
                      'position': scenario.p0,
                      'radarRange': scenario.radarRange,
                      'eta2': eta2,
-                     'N':5,
+                     'N':N,
                      'P_d': scenario.P_d_true}
 
 
@@ -125,6 +125,7 @@ def runSimulation(**kwargs):
     #                         M_required=2,
     #                         N_checks=4,
     #                         groundTruth=simList)
+
     toc0 = time.time() - tic0
     print("Generating simulation data for {0:} targets for {1:} seconds / {2:} scans.  It took {3:.1f} ms".format(
         len(scenario), scenario.simTime, scenario.nScans, toc0 * 1000))
@@ -139,21 +140,16 @@ def runSimulation(**kwargs):
 
     tic1 = time.time()
 
-    def simulate(tracker, initialTargets, scanList, minToc, maxToc, avgToc, **kwargs):
+    def simulate(tracker, simList, scanList, minToc, maxToc, avgToc, **kwargs):
         print("#" * 100)
         time.sleep(0.1)
-        if kwargs.get('preInitiate', False):
-            for index, initialTarget in enumerate(initialTargets):
-                tempTarget = Target(initialTarget.time,
-                                    None,
-                                    np.array(initialTarget.state),
-                                    model.P0,
-                                    measurementNumber=index + 1,
-                                    measurement=model.C_RADAR.dot(initialTarget.state)
-                                    )
-                tracker.initiateTarget(tempTarget)
 
-        for scanIndex, measurementList in enumerate(scanList):
+        startIndex = 0
+        if kwargs.get('preInitialize', False):
+            tracker.preInitialize(simList)
+            startIndex = 1
+
+        for measurementList in scanList[startIndex:]:
             tic = time.time()
             scanTime = measurementList.time
             aisPredictions = aisList.getMeasurements(scanTime)
@@ -164,7 +160,6 @@ def runSimulation(**kwargs):
                                        printAssociation=False,
                                        printCluster=False,
                                        checkIntegrity=True,
-                                       R=False,
                                        **kwargs)
             toc = time.time() - tic
             minToc[0] = toc if toc < minToc[0] else minToc[0]
@@ -184,7 +179,7 @@ def runSimulation(**kwargs):
         p.strip_dirs().sort_stats('time').print_stats(20)
         p.strip_dirs().sort_stats('cumulative').print_stats(20)
     else:
-        simulate(tracker, scenario, scanList, minToc, maxToc, avgToc, preInitiate=False)
+        simulate(tracker, simList, scanList, minToc, maxToc, avgToc, preInitialize=True)
 
     if kwargs.get('printTargetList', False):
         tracker.printTargetList()
@@ -227,17 +222,17 @@ def runSimulation(**kwargs):
         # tracker.plotMeasurementsFromRoot(dummy=False, real = False, includeHistory=False)
         # tracker.plotStatesFromRoot(dummy=False, real=False, ais=True)
         # tracker.plotMeasurementsFromTracks(labels = False, dummy = True, real = True)
-        # tracker.plotLastScan()
+        tracker.plotLastScan()
         # tracker.plotAllScans()
         # tracker.plotLastAisUpdate()
         # tracker.plotAllAisUpdates()
         # tracker.plotHypothesesTrack(colors=colors3, markStates=False)  # CAN BE SLOW!
         tracker.plotActiveTracks(colors=colors2, markInitial=True, labelInitial=True, markRoot=False,
-                                 markStates=True, real=False, dummy=False, ais=True, smooth=False)
-        tracker.plotActiveTracks(colors=colors2, markInitial=False, markRoot=False, markStates=False, real=False,
-                                 dummy=False, ais=False, smooth=True, markEnd=False)
+                                 markStates=True, real=False, dummy=False, ais=False, smooth=False)
+        # tracker.plotActiveTracks(colors=colors2, markInitial=False, markRoot=False, markStates=False, real=False,
+        #                          dummy=False, ais=False, smooth=True, markEnd=False)
 
-        tracker.plotTerminatedTracks()
+        tracker.plotTerminatedTracks(markStates=True, real=False, dummy=False, ais=True)
         plt.axis("equal")
         plt.xlim((scenario.p0[0] - scenario.radarRange * 1.05, scenario.p0[0] + scenario.radarRange * 1.05))
         plt.ylim((scenario.p0[1] - scenario.radarRange * 1.05, scenario.p0[1] + scenario.radarRange * 1.05))
