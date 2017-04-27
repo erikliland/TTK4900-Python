@@ -13,16 +13,19 @@ def plotLostTracks(loadFilePath):
     groundtruthElement = scenarioElement.find(groundtruthTag)
     scenarioSettingsElement = scenarioElement.find(scenariosettingsTag)
     variationsElement = scenarioElement.findall('.Variations[@preinitialized="True"]')[0]
-    plotData = _getPlotDataFromVariations(groundtruthElement,variationsElement)
+    plotData = _getPlotDataFromVariations(groundtruthElement, variationsElement)
     print("Plot data", plotData)
     figure = _plotTrackLoss(plotData)
     figure.savefig(savePath)
 
+
 def plotInitializationTime(filePath):
     pass
 
+
 def plotTrackCorrectness(filePath):
     pass
+
 
 def plotRuntime(filePath):
     pass
@@ -38,7 +41,7 @@ def _getPlotDataFromVariations(groundtruthElement, variationsElement):
         trackLossList = []
         for run in variation.findall(runTag):
             try:
-                trackLossList.append(float(run.get(tracklossTag,0)))
+                trackLossList.append(float(run.get(tracklossTag, 0)))
             except TypeError:
                 pass
         trackLossMean = np.mean(np.array(trackLossList))
@@ -52,8 +55,10 @@ def _getPlotDataFromVariations(groundtruthElement, variationsElement):
             raise KeyError("Duplicate key found")
     return plotData
 
+
 def _plotTrackLoss(plotData):
     return plt.figure()
+
 
 def _getSavePath(loadFilePath):
     head, tail = os.path.split(loadFilePath)
