@@ -15,7 +15,7 @@ class ScenarioBase:
         self.radarPeriod = 60. / 24.  # 24 RPM radar / 48 RPM radar
         self.radarRange = 5500.0  # meters
         self.simulationTimeStep = self.radarPeriod / 4  # sec
-        self.simTime = self.radarPeriod * 30  # sec
+        self.simTime = self.radarPeriod * 60  # sec
         self.nScans = int(self.simTime / self.radarPeriod)
         self.nSimulationSteps = int(self.simTime / self.simulationTimeStep)
         self.P_d_true = 0.8  # Probability of detection
