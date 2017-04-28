@@ -7,5 +7,5 @@ nList = [1, 3, 6, 9]
 path = os.path.join(os.path.expanduser('~'), 'TTK4900-Python', 'data')
 nMonteCarlo = 10
 scenarioList = scenarioList
-filePathList = [os.path.join(path, scenario.name+".xml") for scenario in scenarioList]
+filePathList = [os.path.join(path, scenario.name + ".xml") for scenario in scenarioList]
 baseSeed = 5446

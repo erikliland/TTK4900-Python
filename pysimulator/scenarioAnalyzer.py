@@ -18,6 +18,7 @@ def analyzeFile(filePath):
     tree.write(filePath)
     print("Done:", filePath)
 
+
 def analyzeVariations(groundtruthList, variationsElement):
     preInitialized = variationsElement.get(preinitializedTag)
     # print("preInitialized", preInitialized)
@@ -29,17 +30,20 @@ def analyzeVariations(groundtruthList, variationsElement):
         # print("Analyzing initialization")
         analyzeVariationsInitializationPerformance(groundtruthList, variationsElement)
 
+
 def analyzeVariationsTrackingPerformance(groundtruthList, variationsElement):
     variationList = variationsElement.findall(variationTag)
     for variation in variationList:
         analyzeVariationTrackLossPerformance(groundtruthList, variation)
         analyzeVariationTrackingPerformance(groundtruthList, variation)
 
+
 def analyzeVariationsInitializationPerformance(groundtruthList, variationsElement):
     variationList = variationsElement.findall(variationTag)
 
     for variation in variationList:
         analyzeVariationInitializationPerformance(groundtruthList, variation)
+
 
 def analyzeVariationTrackLossPerformance(groundtruthList, variation):
     runList = variation.findall(runTag)
@@ -53,17 +57,20 @@ def analyzeVariationTrackingPerformance(truetrackList, variation):
         estimateTrackList = run.findall(trackTag)
         for smoothed in [False, True]:
             try:
-                matchList = matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, smoothed)
+                matchList = matchTrueWithEstimatedTracks(
+                    truetrackList, estimateTrackList, smoothed)
                 storeMatchList(run, matchList, smoothed)
             except AssertionError as e:
                 print(variation.attrib)
                 print(run.attrib)
                 raise e
 
+
 def analyzeVariationInitializationPerformance(groundtruthList, variation):
     pass
 
-def matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, smoothed, threshold = 30):
+
+def matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, smoothed, threshold=30):
     import math
     resultList = []
     for trueTrack in truetrackList:
@@ -77,8 +84,10 @@ def matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, smoothed, thr
                                            if e.attrib[smoothedTag] == str(smoothed)][0]
             estimatedStateList = estimatedTrackStatesElement.findall(stateTag)
             timeMatch = _timeMatch(trueTrackStateList, estimatedStateList)
-            trueTrackSlice = [s for s in trueTrackStateList if s.get(timeTag) in timeMatch]
-            estimatedTrackSlice = [s for s in estimatedStateList if s.get(timeTag) in timeMatch]
+            trueTrackSlice = [
+                s for s in trueTrackStateList if s.get(timeTag) in timeMatch]
+            estimatedTrackSlice = [
+                s for s in estimatedStateList if s.get(timeTag) in timeMatch]
             assert len(timeMatch) == len(trueTrackSlice) == len(estimatedTrackSlice)
 
             delta2List = []
@@ -95,11 +104,13 @@ def matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, smoothed, thr
                 del estimatedTrack
                 continue
             meanSquaredError = np.mean(delta2List)
-            assert meanSquaredError > 0., str(meanSquaredError)+str(delta2List)+estimatedTrackID
+            assert meanSquaredError > 0., str(
+                meanSquaredError) + str(delta2List) + estimatedTrackID
             approvedMatch = all([math.sqrt(d2) < threshold for d2 in delta2List])
 
             if approvedMatch:
-                resultList.append((trueTrackID,estimatedTrackID, meanSquaredError, timeMatch))
+                resultList.append((trueTrackID, estimatedTrackID,
+                                   meanSquaredError, timeMatch))
             # else:
             #     resultList.append((i, estimatedTrackID, [], float('inf')))
     # print("resultList", *resultList, sep = "\n")
@@ -108,6 +119,7 @@ def matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, smoothed, thr
     assert not multiplePossibilities
     return resultList
 
+
 def storeMatchList(run, matchList, smoothed):
     for match in matchList:
         trueTrackID = match[0]
@@ -115,10 +127,12 @@ def storeMatchList(run, matchList, smoothed):
         meanNormSquared = match[2]
         timeMatch = match[3]
         trackElement = run.findall('.Track[@id="{:}"]'.format(estimatedTrackID))[0]
-        statesElement = trackElement.findall('.States[@smoothed="{:}"]'.format(smoothed))[0]
+        statesElement = trackElement.findall(
+            '.States[@smoothed="{:}"]'.format(smoothed))[0]
         statesElement.set(matchidTag, trueTrackID)
         statesElement.set(mismatchTag, "{:.4f}".format(meanNormSquared))
         statesElement.set(timematchTag, ", ".join(timeMatch))
+
 
 def _timeMatch(trueTrackStateList, estimatedStateList):
     trueTrackTimeList = [e.get(timeTag) for e in trueTrackStateList]
@@ -126,11 +140,13 @@ def _timeMatch(trueTrackStateList, estimatedStateList):
     commonTimes = [tT for tT in trueTrackTimeList if tT in estimatedTrackTimeList]
     return commonTimes
 
+
 def _parsePosition(positionElement):
     north = positionElement.find(northTag).text
     east = positionElement.find(eastTag).text
-    position = np.array([east,north], dtype=np.double)
+    position = np.array([east, north], dtype=np.double)
     return position
+
 
 def _multiplePossibleMatches(matchList):
     estimateIdList = [m[1] for m in matchList]

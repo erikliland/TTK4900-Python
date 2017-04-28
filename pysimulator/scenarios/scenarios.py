@@ -5,9 +5,11 @@ import xml.etree.ElementTree as ET
 from pymht.utils.xmlDefinitions import *
 import numpy as np
 
+
 class ScenarioBase:
+
     def __init__(self):
-        #Static scenario data
+        # Static scenario data
         self.staticSeed = 5447
         self.initTime = 0.
         self.radarPeriod = 60. / 24.  # 24 RPM radar / 48 RPM radar
@@ -28,12 +30,12 @@ class ScenarioBase:
 
     def storeScenarioSettings(self, scenarioElement):
         scenariosettingsElement = ET.SubElement(scenarioElement, scenariosettingsTag)
-        for k,v in vars(self).items():
-            ET.SubElement(scenariosettingsElement,str(k)).text = str(v)
-
+        for k, v in vars(self).items():
+            ET.SubElement(scenariosettingsElement, str(k)).text = str(v)
 
 
 class Scenario(ScenarioBase):
+
     def __init__(self, name):
         ScenarioBase.__init__(self)
         self.name = name
@@ -48,26 +50,27 @@ class Scenario(ScenarioBase):
     def __len__(self):
         return self.initialTargets.__len__()
 
-
-
-
     def append(self, newTarget):
         if type(newTarget) is not SimTarget:
             raise ValueError("Wrong input type. Must be SimTarget")
         self.initialTargets.append(newTarget)
 
     def add(self, state, **kwargs):
-        default = {'probabilityOfReceive':self.P_r}
-        self.initialTargets.append(SimTarget(state, self.initTime, self.P_d_true, self.sigma_Q, **{**default,**kwargs}))
+        default = {'probabilityOfReceive': self.P_r}
+        self.initialTargets.append(SimTarget(state,
+                                             self.initTime,
+                                             self.P_d_true,
+                                             self.sigma_Q,
+                                             **{**default, **kwargs}))
 
     def getSimList(self):
         sim.seed_simulator(self.staticSeed)
         return sim.simulateTargets(self.initialTargets,
-                                      self.simTime,
-                                      self.simulationTimeStep,
-                                      model)
+                                   self.simTime,
+                                   self.simulationTimeStep,
+                                   model)
 
-    def getSimulatedScenario(self,seed, simList, lambda_phi, P_d):
+    def getSimulatedScenario(self, seed, simList, lambda_phi, P_d):
         sim.seed_simulator(seed)
 
         scanList = sim.simulateScans(simList,
@@ -77,7 +80,7 @@ class Scenario(ScenarioBase):
                                      lambda_phi,
                                      self.radarRange,
                                      self.p0,
-                                     P_d = P_d)
+                                     P_d=P_d)
 
         aisList = sim.simulateAIS(simList,
                                   model.Phi,
@@ -87,7 +90,7 @@ class Scenario(ScenarioBase):
                                   self.radarPeriod)
         return scanList, aisList
 
-#Scenario 1
+# Scenario 1
 scenario1 = Scenario("Scenario1")
 scenario1.add([-2000, 2100, 4, -4])
 scenario1.add([100, -2000, -2, 8])
@@ -106,7 +109,7 @@ scenario1.add([0, -5000, 10, 2])
 scenario1.add([-400, 300, 17, 0], mmsi=257304900, aisClass='B')
 scenario1.add([0, 2000, 15, 15])
 
-#Scenario 2
+# Scenario 2
 scenario2 = Scenario("Scenario2")
 scenario2.add([-2000, 2100, 4, -4])
 scenario2.add([100, -2000, -2, 8])
@@ -125,7 +128,7 @@ scenario2.add([0, -5000, 10, 2])
 scenario2.add([-400, 300, 17, 0], mmsi=257304900, aisClass='A')
 scenario2.add([0, 2000, 15, 15])
 
-#Scenario 3
+# Scenario 3
 scenario3 = Scenario("Scenario3")
 scenario3.add([-2000, 2100, 4, -4], mmsi=257114400, aisClass='B')
 scenario3.add([100, -2000, -2, 8], mmsi=257114401, aisClass='B')
@@ -144,7 +147,7 @@ scenario3.add([0, -5000, 10, 2], mmsi=257114413, aisClass='B')
 scenario3.add([-400, 300, 17, 0], mmsi=257304914, aisClass='B')
 scenario3.add([0, 2000, 15, 15], mmsi=257114415, aisClass='B')
 
-#Scenario 4
+# Scenario 4
 scenario4 = Scenario("Scenario4")
 scenario4.add([-2000, 2100, 4, -4], mmsi=257114400, aisClass='A')
 scenario4.add([100, -2000, -2, 8], mmsi=257114401, aisClass='A')

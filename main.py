@@ -10,6 +10,7 @@ import pymht.models.pv as model
 from pysimulator import simulationConfig
 from pysimulator.scenarios.defaults import *
 
+
 def runSimulation(**kwargs):
     minToc = [float('Inf')]
     maxToc = [0]
@@ -65,7 +66,6 @@ def runSimulation(**kwargs):
 
     scenario = simulationConfig.scenarioList[3]
 
-
     if kwargs.get('printInitialTargets', False):
         print("Initial targets:")
         print(scenario, sep='\n', end="\n\n")
@@ -108,9 +108,8 @@ def runSimulation(**kwargs):
                      'position': scenario.p0,
                      'radarRange': scenario.radarRange,
                      'eta2': eta2,
-                     'N':N,
+                     'N': N,
                      'P_d': scenario.P_d_true}
-
 
     tracker = tomht.Tracker(*trackerArgs, groundTruth=simList, **{**trackerKwargs, **kwargs})
 
@@ -136,7 +135,6 @@ def runSimulation(**kwargs):
 
     if kwargs.get('printAISList', False):
         aisList.print()
-
 
     tic1 = time.time()
 
@@ -193,7 +191,6 @@ def runSimulation(**kwargs):
     print('Completed {0:} scans in {1:.0f} seconds. Min {2:4.1f} ms Avg {3:4.1f} ms Max {4:4.1f} ms'.format(
         scenario.nScans, toc1, minToc[0] * 1000, np.average(avgToc) * 1000, maxToc[0] * 1000))
 
-
     if 'exportPath' in kwargs:
         scenarioElement = tracker.getScenarioElement()
         simList.storeGroundTruth(scenarioElement)
@@ -234,9 +231,10 @@ def runSimulation(**kwargs):
 
         tracker.plotTerminatedTracks(markStates=True, real=False, dummy=False, ais=True)
         plt.axis("equal")
-        plt.xlim((scenario.p0[0] - scenario.radarRange * 1.05, scenario.p0[0] + scenario.radarRange * 1.05))
-        plt.ylim((scenario.p0[1] - scenario.radarRange * 1.05, scenario.p0[1] + scenario.radarRange * 1.05))
-
+        plt.xlim((scenario.p0[0] - scenario.radarRange * 1.05,
+                  scenario.p0[0] + scenario.radarRange * 1.05))
+        plt.ylim((scenario.p0[1] - scenario.radarRange * 1.05,
+                  scenario.p0[1] + scenario.radarRange * 1.05))
 
         # plt.xlim((-3910,-3870))
         # plt.ylim((20,50))
@@ -255,7 +253,8 @@ if __name__ == '__main__':
                                      argument_default=argparse.SUPPRESS)
     parser.add_argument('-R', help="Run recursive", action='store_true')
     args = vars(parser.parse_args())
-    exportPath = os.path.join(os.path.expanduser('~'),'TTK4900-Python','data','test.xml')
+    exportPath = os.path.join(os.path.expanduser(
+        '~'), 'TTK4900-Python', 'data', 'test.xml')
     print("Storing at", exportPath)
     runSimulation(plot=True,
                   profile=False,
