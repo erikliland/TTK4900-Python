@@ -10,6 +10,7 @@ license = "BSD"
 keywords = 'simulation'
 url = 'http://autosea.github.io/sf/2016/04/15/radar_ais/'
 install_requires = ['matplotlib', 'numpy', 'scipy', 'termcolor']
+dependency_links = ['https://github.com/erikliland/pyMHT/tarball/master']
 
 packages = find_packages(exclude=['logs', 'data', 'profile'])
 print("Packages", packages)
@@ -25,6 +26,7 @@ setup(
     packages=packages,
     include_package_data=True,
     install_requires=install_requires,
+    dependency_links = dependency_links,
     entry_points={
         'console_scripts': [
             'simAllSingle=pysimulator.runScenarios:mainSingle',
