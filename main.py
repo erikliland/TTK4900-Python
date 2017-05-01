@@ -17,7 +17,7 @@ def runSimulation(**kwargs):
     avgToc = []
     tic0 = time.time()
     #
-    seed = simulationConfig.baseSeed + 7
+    seed = simulationConfig.baseSeed + 0
     # p0 = np.array([100., -100.])
     # radarRange = 5500.0  # meters
     # maxSpeed = 22.0  # meters / second
@@ -30,7 +30,7 @@ def runSimulation(**kwargs):
     # nSimulationSteps = int(simTime / simulationTimeStep)
     lambda_phi = 4e-6
     # lambda_nu = 0.0002
-    P_d = 0.5  # Probability of detection
+    P_d = 0.6  # Probability of detection
     N = 1  # Number of  timesteps to tail (N-scan)
     # eta2 = 5.99  # 95% confidence
     #
@@ -193,7 +193,7 @@ def runSimulation(**kwargs):
 
     if 'exportPath' in kwargs:
         scenarioElement = tracker.getScenarioElement()
-        simList.storeGroundTruth(scenarioElement)
+        simList.storeGroundTruth(scenarioElement, scenario)
         tracker._storeRun(scenarioElement)
         path = kwargs.get('exportPath')
         hpf.writeElementToFile(path, scenarioElement)

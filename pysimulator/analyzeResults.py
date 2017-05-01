@@ -8,4 +8,4 @@ def analyseResults(filePathList):
 
 if __name__ == '__main__':
     from pysimulator.simulationConfig import filePathList
-    analyseResults(filePathList[0:1])
+    analyseResults(filePathList[3:4])

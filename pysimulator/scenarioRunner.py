@@ -3,7 +3,7 @@ import pymht.utils.helpFunctions as hpf
 import xml.etree.ElementTree as ET
 from pymht.utils.xmlDefinitions import *
 from pysimulator.scenarios.defaults import *
-import o
+import os
 import datetime
 
 
@@ -62,7 +62,8 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
                      'radarRange': scenario.radarRange,
                      'eta2': eta2,
                      'N': N,
-                     'P_d': scenario.P_d_true}
+                     'P_d': scenario.P_d_true,
+                     'dynamicWindow': False}
 
     storeTrackerData(variationElement, trackerArgs, trackerKwargs)
     for i in range(nSim):
