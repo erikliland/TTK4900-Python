@@ -16,7 +16,9 @@ def runSimulation(**kwargs):
     maxToc = [0]
     avgToc = []
     tic0 = time.time()
-    #
+
+    scenario = simulationConfig.scenarioList[0]
+
     seed = simulationConfig.baseSeed + 0
     # p0 = np.array([100., -100.])
     # radarRange = 5500.0  # meters
@@ -25,13 +27,13 @@ def runSimulation(**kwargs):
     # simulationTimeStep = radarPeriod / 2 #sec
     # # aisPeriod = radarPeriod * 3 #sec
     # P_r = 0.9 #AIS probability of receive
-    # simTime = radarPeriod * 30  # sec
+    simTime = scenario.radarPeriod * 60  # sec
     # nScans = int(simTime / radarPeriod)
     # nSimulationSteps = int(simTime / simulationTimeStep)
     lambda_phi = 4e-6
     # lambda_nu = 0.0002
     P_d = 0.6  # Probability of detection
-    N = 1  # Number of  timesteps to tail (N-scan)
+    N = 6  # Number of  timesteps to tail (N-scan)
     # eta2 = 5.99  # 95% confidence
     #
     # assert simulationTimeStep <= radarPeriod
@@ -64,13 +66,12 @@ def runSimulation(**kwargs):
     #                                 mmsi=257304900, aisClass='B', probabilityOfReceive=P_r))
     # initialTargets.append(SimTarget([0, 2000, 15, 15], initTime, P_d, model.sigmaQ_true))
 
-    scenario = simulationConfig.scenarioList[3]
 
     if kwargs.get('printInitialTargets', False):
         print("Initial targets:")
         print(scenario, sep='\n', end="\n\n")
 
-    simList = scenario.getSimList()
+    simList = scenario.getSimList(simTime=simTime)
 
     if kwargs.get('printSimList', False):
         print("Sim list:")
@@ -109,7 +110,7 @@ def runSimulation(**kwargs):
                      'radarRange': scenario.radarRange,
                      'eta2': eta2,
                      'N': N,
-                     'P_d': scenario.P_d_true}
+                     'P_d': P_d}
 
     tracker = tomht.Tracker(*trackerArgs, groundTruth=simList, **{**trackerKwargs, **kwargs})
 
@@ -160,6 +161,8 @@ def runSimulation(**kwargs):
                                        checkIntegrity=True,
                                        **kwargs)
             toc = time.time() - tic
+            # print("H",tracker.__trackNodes__[7].measurementNumber,": ",tracker.__trackNodes__[7].cumulativeNLLR)
+            # print("TrackNode", tracker.__trackNodes__[7])
             minToc[0] = toc if toc < minToc[0] else minToc[0]
             maxToc[0] = toc if toc > maxToc[0] else maxToc[0]
             avgToc.append(toc)
@@ -171,7 +174,7 @@ def runSimulation(**kwargs):
         # try memory_profiler
         import cProfile
         import pstats
-        cProfile.runctx("simulate(tracker,initialTargets,scanList, minToc, maxToc, avgToc)",
+        cProfile.runctx("simulate(tracker, simList, scanList, minToc, maxToc, avgToc, preInitialize=True)",
                         globals(), locals(), 'mainProfile.prof')
         p = pstats.Stats('mainProfile.prof')
         p.strip_dirs().sort_stats('time').print_stats(20)
@@ -219,17 +222,17 @@ def runSimulation(**kwargs):
         # tracker.plotMeasurementsFromRoot(dummy=False, real = False, includeHistory=False)
         # tracker.plotStatesFromRoot(dummy=False, real=False, ais=True)
         # tracker.plotMeasurementsFromTracks(labels = False, dummy = True, real = True)
-        tracker.plotLastScan()
-        # tracker.plotAllScans()
+        # tracker.plotLastScan()
+        # tracker.plotAllScans(stepsBack=N)
         # tracker.plotLastAisUpdate()
-        # tracker.plotAllAisUpdates()
-        # tracker.plotHypothesesTrack(colors=colors3, markStates=False)  # CAN BE SLOW!
-        tracker.plotActiveTracks(colors=colors2, markInitial=True, labelInitial=True, markRoot=False,
-                                 markStates=True, real=False, dummy=False, ais=False, smooth=False)
+        # tracker.plotAllAisUpdates(stepsBack=N)
+        # tracker.plotHypothesesTrack(colors=colors3, markStates=True)  # CAN BE SLOW!
+        tracker.plotActiveTracks(colors=colors2, markInitial=True, labelInitial=True, markRoot=True,
+                                 markStates=False, real=True, dummy=True, ais=True, smooth=False)
         # tracker.plotActiveTracks(colors=colors2, markInitial=False, markRoot=False, markStates=False, real=False,
         #                          dummy=False, ais=False, smooth=True, markEnd=False)
 
-        tracker.plotTerminatedTracks(markStates=True, real=False, dummy=False, ais=True)
+        tracker.plotTerminatedTracks(markStates=False, real=False, dummy=False, ais=True)
         plt.axis("equal")
         plt.xlim((scenario.p0[0] - scenario.radarRange * 1.05,
                   scenario.p0[0] + scenario.radarRange * 1.05))
@@ -258,11 +261,11 @@ if __name__ == '__main__':
     print("Storing at", exportPath)
     runSimulation(plot=True,
                   profile=False,
-                  printInitialTargets=True,
+                  printInitialTargets=False,
                   printTargetList=False,
                   printScanList=False,
                   printAssociation=False,
-                  printAISList=True,
+                  printAISList=False,
                   exportPath=exportPath,
                   **args)
     print("-" * 100)

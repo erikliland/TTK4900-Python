@@ -8,5 +8,5 @@ def plotResults(filePathList):
         pool.map(resultsPlotter.plotTrackingPercentage, filePathList)
 
 if __name__ == '__main__':
-    from pysimulator.simulationConfig import filePathList
-    plotResults(filePathList[3:4])
+    from pysimulator.simulationConfig import trackingFilePathList
+    plotResults(trackingFilePathList)

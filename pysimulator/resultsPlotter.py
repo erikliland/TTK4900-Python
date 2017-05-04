@@ -192,7 +192,7 @@ def _plotTrackingPercentage(plotData):
     ax.set_zlabel("\nTracking (%)", fontsize=18, linespacing=3)
     ax.set_ylabel("\nProbability of detection (%)", fontsize=18, linespacing=2)
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
-    ax.set_zlim(minTracking, 100)
+    ax.set_zlim(96, 100)
     ax.tick_params(labelsize=16, pad=1)
     yStart, yEnd = ax.get_ylim()
     ax.yaxis.set_ticks(np.arange(yStart, yEnd * 1.01, 10))
