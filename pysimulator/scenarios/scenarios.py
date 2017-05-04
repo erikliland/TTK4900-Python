@@ -63,10 +63,12 @@ class Scenario(ScenarioBase):
                                              self.sigma_Q,
                                              **{**default, **kwargs}))
 
-    def getSimList(self):
+    def getSimList(self, simTime=None):
+        if simTime is None:
+            simTime = self.simTime
         sim.seed_simulator(self.staticSeed)
         return sim.simulateTargets(self.initialTargets,
-                                   self.simTime,
+                                   simTime,
                                    self.simulationTimeStep,
                                    model)
 
@@ -87,7 +89,8 @@ class Scenario(ScenarioBase):
                                   model.C_AIS,
                                   model.R_AIS(model.sigmaR_AIS_true),
                                   model.GPS_COVARIANCE_PRECISE,
-                                  self.radarPeriod)
+                                  self.radarPeriod,
+                                  self.initTime)
         return scanList, aisList
 
 # Scenario 1

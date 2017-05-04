@@ -3,7 +3,7 @@ from pymht.utils.xmlDefinitions import *
 import numpy as np
 
 
-def analyzeFile(filePath):
+def analyzeTrackingFile(filePath):
     print("Starting:", filePath)
     tree = ET.parse(filePath)
     threshold = 15
@@ -15,65 +15,66 @@ def analyzeFile(filePath):
     groundtruthList = groundtruthElement.findall(trackTag)
 
     for variationsElement in variationsList:
-        analyzeVariations(groundtruthList, variationsElement, threshold)
+        if variationsElement.get(preinitializedTag) != "True":
+            print("Deleting", variationsElement.attrib)
+            scenarioElement.remove(variationsElement)
+            continue
+        analyzeVariationsTrackingPerformance(groundtruthList, variationsElement, threshold)
     tree.write(filePath)
     print("Done:", filePath)
 
+def analyzeInitFile(filePath):
+    print("Starting:", filePath)
+    tree = ET.parse(filePath)
+    threshold = 15
+    scenarioElement = tree.getroot()
+    groundtruthElement = scenarioElement.find(groundtruthTag)
+    scenariosettingsElement = scenarioElement.find(scenariosettingsTag)
+    variationsList = scenarioElement.findall(variationsTag)
+    print("Scenario name:", scenariosettingsElement.find(nameTag).text)
+    groundtruthList = groundtruthElement.findall(trackTag)
 
-def analyzeVariations(groundtruthList, variationsElement, threshold):
-    preInitialized = variationsElement.get(preinitializedTag)
-    # print("preInitialized", preInitialized)
-
-    if preInitialized == "True":
-        # print("Analyzing tracking")
-        analyzeVariationsTrackingPerformance(groundtruthList, variationsElement, threshold)
-    else:
-        # print("Analyzing initialization")
-        analyzeVariationsInitializationPerformance(groundtruthList, variationsElement)
-
+    for variationsElement in variationsList:
+        if variationsElement.get(preinitializedTag) != "False":
+            print("Deleting", variationsElement.attrib)
+            scenarioElement.remove(variationsElement)
+            continue
+        analyzeVariationsInitializationPerformance(groundtruthList, variationsElement, threshold)
+    tree.write(filePath)
+    print("Done:", filePath)
 
 def analyzeVariationsTrackingPerformance(groundtruthList, variationsElement, threshold):
     variationList = variationsElement.findall(variationTag)
     for variation in variationList:
         analyzeVariationTrackLossPerformance(groundtruthList, variation, threshold)
-        # analyzeVariationTrackingPerformance(groundtruthList, variation)
 
 
-def analyzeVariationsInitializationPerformance(groundtruthList, variationsElement):
+def analyzeVariationsInitializationPerformance(groundtruthList, variationsElement, threshold):
     variationList = variationsElement.findall(variationTag)
 
-    for variation in variationList:
-        analyzeVariationInitializationPerformance(groundtruthList, variation)
+    for variation in variationList[0:1]:
+        print("Analyzing variation", variation.attrib)
+        analyzeVariationInitializationPerformance(groundtruthList, variation, threshold)
 
 
 def analyzeVariationTrackLossPerformance(groundtruthList, variation, threshold):
     runList = variation.findall(runTag)
     for run in runList:
         estimateTrackList = run.findall(trackTag)
-        matchList = matchTrueWithEstimatedTracks(groundtruthList, estimateTrackList, threshold)
-        storeMatchList(run, matchList)
+        matchList = _matchTrueWithEstimatedTracks(groundtruthList, estimateTrackList, threshold)
+        _storeMatchList(run, matchList)
 
 
-# def analyzeVariationTrackingPerformance(groundtruthList, variation):
-#     runList = variation.findall(runTag)
-#     for run in runList:
-#         estimateTrackList = run.findall(trackTag)
-#         for smoothed in [False, True]:
-#             try:
-#                 matchList = matchTrueWithEstimatedTracks(
-#                     groundtruthList, estimateTrackList, smoothed)
-#                 storeMatchList(run, matchList, smoothed)
-#             except AssertionError as e:
-#                 print(variation.attrib)
-#                 print(run.attrib)
-#                 raise e
+def analyzeVariationInitializationPerformance(groundtruthList, variation, threshold):
+    runList = variation.findall(runTag)
+    for run in runList:
+        estimateTrackList = run.findall(trackTag)
+        matchList = _matchAndTimeInitialTracks(groundtruthList, estimateTrackList, threshold)
+        # print("matchList", matchList)
+        # storeMatchList(run, matchList)
 
 
-def analyzeVariationInitializationPerformance(groundtruthList, variation):
-    pass
-
-
-def matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
+def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
     resultList = []
     for trueTrack in truetrackList:
         trueTrackStatesElement = trueTrack.find(statesTag)
@@ -110,16 +111,22 @@ def matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
 
     _multiplePossibleMatches(resultList)
 
-    # for duplicate in duplicates:
-    #     duplicateTuples = [(e, e[2]) for e in resultList if e[1] == duplicate]
-    #     sortedDuplicates = sorted(duplicateTuples, key=lambda tup: tup[1])
-    #     for e in sortedDuplicates[1:]:
-    #         resultList.remove(e[0])
-    # if multiplePossibilities:
-    #     multiplePossibilities, duplicates = _multiplePossibleMatches(resultList)
-
-    # assert not multiplePossibilities, "\n".join([str(r) for r in resultList if r[1] in duplicates]) + str(duplicates)
     return resultList
+
+
+def _matchAndTimeInitialTracks(groundtruthList, estimateTrackList, threshold):
+    for trueTrack in groundtruthList:
+        trueTrackStatesElement = trueTrack.find(statesTag)
+        trueTrackStateList = trueTrackStatesElement.findall(stateTag)
+        trueTrackID = trueTrack.get(idTag)
+        for estimatedTrack in estimateTrackList:
+            estimatedTrackID = estimatedTrack.get(idTag)
+            estimatedTrackStatesElement = estimatedTrack.find(statesTag)
+
+
+
+
+
 
 def _compareTrackList(trueTrackStateList, estimatedStateList, threshold):
     timeMatch = _timeMatch(trueTrackStateList, estimatedStateList)
@@ -175,7 +182,7 @@ def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshol
     return ([], np.nan, None)
 
 
-def storeMatchList(run, matchList):
+def _storeMatchList(run, matchList):
     for match in matchList:
         (trueTrackID,
          estimatedTrackID,
@@ -204,7 +211,6 @@ def storeMatchList(run, matchList):
         smoothedStatesElement.set(meansquarederrorTag, "{:.4f}".format(smoothedMeanSquaredError))
 
 
-
 def _timeMatch(trueTrackStateList, estimatedStateList):
     trueTrackTimeList = [e.get(timeTag) for e in trueTrackStateList]
     estimatedTrackTimeList = [e.get(timeTag) for e in estimatedStateList]
@@ -222,8 +228,6 @@ def _parsePosition(positionElement):
 def _multiplePossibleMatches(resultList):
     import collections
     estimateIdList = [m[1] for m in resultList]
-    # estimateIdSet = set(estimateIdList)
-    # repeatingEstimates = len(estimateIdList) > len(estimateIdSet)
     duplicates = [item
                   for item, count in collections.Counter(estimateIdList).items()
                   if count > 1]
@@ -232,5 +236,3 @@ def _multiplePossibleMatches(resultList):
         sortedDuplicates = sorted(duplicateTuples, key=lambda tup: tup[1])
         for e in sortedDuplicates[1:]:
             resultList.remove(e[0])
-
-    # return repeatingEstimates, duplicates
