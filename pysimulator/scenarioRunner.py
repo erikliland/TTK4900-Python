@@ -117,8 +117,8 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
                    lambda_nu)
 
     trackerKwargs = {'maxSpeedMS': maxSpeedMS,
-                     'M_required': kwargs.get(mInitTag,M_required),
-                     'N_checks': kwargs.get(nInitTag,N_checks),
+                     'M_required': variationDict.get(mInitTag,M_required),
+                     'N_checks': variationDict.get(nInitTag,N_checks),
                      'position': scenario.p0,
                      'radarRange': scenario.radarRange,
                      'eta2': eta2,
