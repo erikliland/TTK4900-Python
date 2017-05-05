@@ -2,8 +2,6 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
-
-
 import xml.etree.ElementTree as ET
 from pymht.utils.xmlDefinitions import *
 import os
@@ -22,6 +20,7 @@ def plotTrackLoss(loadFilePath):
     figure = _plotTrackLossPercentage(plotData)
     figure.savefig(savePath)
 
+
 def plotTrackingPercentage(loadFilePath):
     print("plotTrackingPercentage", loadFilePath)
     savePath = _getSavePath(loadFilePath, "TrackingPercentage")
@@ -36,8 +35,19 @@ def plotTrackingPercentage(loadFilePath):
     figure.savefig(savePath)
 
 
-def plotInitializationTime(filePath):
-    pass
+def plotInitializationTime(loadFilePath):
+    print("plotInitializationTime", loadFilePath)
+    tree = ET.parse(loadFilePath)
+    scenarioElement = tree.getroot()
+    groundtruthElement = scenarioElement.find(groundtruthTag)
+    scenarioSettingsElement = scenarioElement.find(scenariosettingsTag)
+    variationsElement = scenarioElement.find('.Variations[@preinitialized="False"]')
+    variationsInitLog = _getInitializationTimePlotData(variationsElement)
+    # print("variationsInitLog", *[str(k)+str(v) for k,v in variationsInitLog.items()], sep="\n")
+    simLength = float(scenarioSettingsElement.find("simTime").text)
+    timeStep = float(scenarioSettingsElement.find("radarPeriod").text)
+    nTargets = len(groundtruthElement.findall(trackTag))
+    _plotInitializationTime2D(variationsInitLog, loadFilePath, simLength, timeStep, nTargets)
 
 
 def plotTrackCorrectness(filePath):
@@ -77,6 +87,7 @@ def _getTrackLossPlotData(groundtruthElement, variationsElement):
             raise KeyError("Duplicate key found")
     return plotData
 
+
 def _getTrackingPercentagePlotData(groundtruthElement, variationsElement):
     trueIdList = [t.get(idTag)
                   for t in groundtruthElement.findall(trackTag)]
@@ -108,6 +119,43 @@ def _getTrackingPercentagePlotData(groundtruthElement, variationsElement):
         else:
             raise KeyError("Duplicate key found")
     return plotData
+
+
+def _getInitializationTimePlotData(variationsElement):
+    variationsInitLog = {}
+    variationElementList = variationsElement.findall(variationTag)
+    for variationElement in variationElementList:
+        M_init = variationElement.get(mInitTag)
+        N_init = variationElement.get(nInitTag)
+        P_d = variationElement.get(pdTag)
+        lambda_phi = variationElement.get(lambdaphiTag)
+        initTimeLog = dict()
+        runElementList = variationElement.findall(runTag)[0:1]
+        for run in runElementList:
+            initiationLogElement = run.find(initializationLogTag)
+            initialTargetList = initiationLogElement.findall(initialtargetTag)
+            for e in initialTargetList:
+                time = e.get(timeTag)
+                if time in initTimeLog:
+                    initTimeLog[time] += 1
+                else:
+                    initTimeLog[time] = 1
+        for k,v in initTimeLog.items():
+            initTimeLog[k] = float(v) / float(len(runElementList))
+
+        #TODO: http://stackoverflow.com/questions/14692690/access-nested-dictionary-items-via-a-list-of-keys
+        if M_init not in variationsInitLog:
+            variationsInitLog[M_init] = {}
+        if N_init not in variationsInitLog[M_init]:
+            variationsInitLog[M_init][N_init] = {}
+        if lambda_phi not in variationsInitLog[M_init][N_init]:
+            variationsInitLog[M_init][N_init][lambda_phi] = {}
+        if P_d not in variationsInitLog[M_init][N_init][lambda_phi]:
+            variationsInitLog[M_init][N_init][lambda_phi][P_d] = initTimeLog
+        else:
+            raise KeyError("Duplicate key found")
+
+    return variationsInitLog
 
 
 def _plotTrackLossPercentage(plotData):
@@ -205,6 +253,80 @@ def _plotTrackingPercentage(plotData):
 
     return figure
 
+
+def _plotInitializationTime3D(plotData, loadFilePath, simLength, timeStep, nTargets):
+    for M_init, d1 in plotData.items():
+        for N_init, d2 in d1.items():
+            figure = plt.figure(figsize=(10, 10), dpi=100)
+            lambdaPhiSet = set()
+            colors = sns.color_palette(n_colors=5)
+            sns.set_style(style='white')
+            ax = figure.add_subplot(111, projection='3d')
+            savePath = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
+            for k, (lambda_phi, d3) in enumerate(d2.items()):
+                lambdaPhiSet.add(float(lambda_phi))
+                for j, (P_d, initTimeLog) in enumerate(d3.items()):
+                    timeArray = np.arange(0, simLength, timeStep)
+                    pmf = np.zeros_like(timeArray)
+                    for i, time in enumerate(timeArray):
+                        if str(time) in initTimeLog:
+                            pmf[i] = initTimeLog[str(time)]
+                    cpmf = np.cumsum(pmf) / float(nTargets)
+                    lambdaphiArray = np.ones_like(timeArray) *float(lambda_phi)
+                    ax.plot(timeArray, lambdaphiArray, cpmf,
+                            label="P_d = {:}".format(P_d) if k==0 else None,
+                            c=colors[j])
+            ax.view_init(15, -150)
+            ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+            ax.set_zlim(0, 1)
+            ax.yaxis.set_ticks(list(lambdaPhiSet))
+            ax.set_xlabel("\nTime steps", fontsize=18, linespacing=2)
+            ax.set_ylabel("$\lambda_{\phi}$", fontsize=18, labelpad=30)
+            ax.set_zlabel("\ncpfm", fontsize=18, linespacing=3)
+            plt.title("M={0:}, N={1:}".format(M_init, N_init), fontsize=18)
+            plt.legend(loc=4)
+            plt.savefig(savePath)
+            plt.close()
+
+def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTargets):
+    for M_init, d1 in plotData.items():
+        for N_init, d2 in d1.items():
+            figure = plt.figure(figsize=(10, 10), dpi=100)
+            ax = figure.add_subplot(111)
+            lambdaPhiSet = set()
+            colors = sns.color_palette(n_colors=5)
+            linestyle = ['-','--','-.',]
+            sns.set_style(style='white')
+            savePath = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
+            for k, (lambda_phi, d3) in enumerate(d2.items()):
+                lambdaPhiSet.add(float(lambda_phi))
+                for j, (P_d, initTimeLog) in enumerate(d3.items()):
+                    timeArray = np.arange(0, simLength, timeStep)
+                    pmf = np.zeros_like(timeArray)
+                    for i, time in enumerate(timeArray):
+                        if str(time) in initTimeLog:
+                            pmf[i] = initTimeLog[str(time)]
+                    cpmf = np.cumsum(pmf) / float(nTargets)
+                    ax.plot(timeArray,
+                            cpmf,
+                            label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
+                            c=colors[j],
+                            linestyle=linestyle[k])
+            ax.set_ylim(0,1)
+            plt.xlabel("Time steps", fontsize=18, linespacing=2)
+            plt.ylabel("cpfm", fontsize=18, linespacing=3)
+            plt.title("M={0:}, N={1:}".format(M_init, N_init), fontsize=18)
+            handles, labels = ax.get_legend_handles_labels()
+            import operator
+            hl = sorted(zip(handles, labels),
+                        key=operator.itemgetter(1),
+                        reverse=True)
+            handles2, labels2 = zip(*hl)
+            plt.grid(False)
+            ax.legend(handles2, labels2, loc=4)
+            sns.despine(ax=ax, offset=0)
+            plt.savefig(savePath)
+            plt.close()
 
 def _getSavePath(loadFilePath, nameAdd):
     head, tail = os.path.split(loadFilePath)
