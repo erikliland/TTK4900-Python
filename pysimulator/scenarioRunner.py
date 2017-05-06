@@ -83,7 +83,7 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
                 variationElement = variationsElement.find(
                     '.Variation[@M_init="{0:}"][@N_init="{1:}"][@Pd="{2:}"][@lambda_phi="{3:}"]'.format(M, N, P_d, lambda_phi))
                 if variationElement is None:
-                    print("Creating variationElement", P_d, N, lambda_phi)
+                    # print("Creating variationElement", P_d, N, lambda_phi)
                     variationElement = ET.SubElement(
                         variationsElement, variationTag,
                         attrib={str(k): str(v) for k, v in variationDict.items()})
@@ -129,10 +129,10 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
     if trackersettingsElement is None:
         storeTrackerData(variationElement, trackerArgs, trackerKwargs)
     for i in range(nSim):
-        print("i", i)
+        # print("i", i)
         runElement = variationElement.find('Run[@iteration="{:}"]'.format(i+1))
         if runElement is not None:
-            print("Skipping")
+            # print("Skipping")
             continue
         if kwargs.get('printLog', True):
             print("Running scenario iteration", i, end="", flush=True)
@@ -140,7 +140,7 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
         scanList, aisList = scenario.getSimulatedScenario(seed, simList, lambda_phi, P_d)
 
         try:
-            print("Running", variationDict)
+            # print("Running", variationDict)
             runSimulation(variationElement, simList, scanList, aisList, trackerArgs,
                           trackerKwargs, preInitialized,
                           seed=seed, **kwargs)
