@@ -68,10 +68,11 @@ def analyzeVariationTrackLossPerformance(groundtruthList, variation, threshold):
 def analyzeVariationInitializationPerformance(groundtruthList, variation, threshold):
     runList = variation.findall(runTag)
     for runElement in runList:
-        estimateTrackList = runElement.findall(trackTag)
-        initiationLog, falseTrackIdSet = _matchAndTimeInitialTracks(groundtruthList, estimateTrackList, threshold)
-        print("falseTrackIdSet",falseTrackIdSet)
-        _storeInitializationLog(runElement, initiationLog)
+        for initiationLogElement in runElement.findall(initializationLogTag):
+            runElement.remove(initiationLogElement)
+        initiationLog, falseInitiationLog = _matchAndTimeInitialTracks(groundtruthList, runElement, threshold)
+        # print("falseInitiationLog",falseInitiationLog)
+        _storeInitializationLog(runElement, initiationLog, falseInitiationLog)
 
 
 def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
@@ -87,10 +88,10 @@ def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
             estimatedStateList = estimatedTrackStatesElement.findall(stateTag)
             smoothedEstimatedStateList = smoothedEstimatedTrackStatesElement.findall(stateTag)
 
-            timeMatch, goodTimeMatch, meanSquaredError, lostTrack = _compareTrackList(
+            timeMatch, goodTimeMatch, rmsError, lostTrack = _compareTrackList(
                 trueTrackStateList,estimatedStateList,threshold)
 
-            _, _, smoothedMeanSquaredError, _ = _compareTrackList(
+            _, _, smoothedRmsError, _ = _compareTrackList(
                 trueTrackStateList, smoothedEstimatedStateList, threshold)
             timeMatchLength = len(timeMatch)
             goodTimeMatchLength = len(goodTimeMatch)
@@ -100,8 +101,8 @@ def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
 
                 resultList.append((trueTrackID,
                                    estimatedTrackID,
-                                   meanSquaredError,
-                                   smoothedMeanSquaredError,
+                                   rmsError,
+                                   smoothedRmsError,
                                    lostTrack,
                                    timeMatch,
                                    goodTimeMatch,
@@ -114,7 +115,8 @@ def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
     return resultList
 
 
-def _matchAndTimeInitialTracks(groundtruthList, estimateTrackList, threshold):
+def _matchAndTimeInitialTracks(groundtruthList, runElement, threshold):
+    estimateTrackList = runElement.findall(trackTag)
     trueTrackList = []
     for trueTrack in groundtruthList:
         trueTrackStatesElement = trueTrack.find(statesTag)
@@ -165,7 +167,10 @@ def _matchAndTimeInitialTracks(groundtruthList, estimateTrackList, threshold):
             falseTrackIdSet.remove(str(newTracks[initIndex][1]))
             initiationLog.append((time, uninitiatedTracks[trackIndex][0]))
     initiationLog.sort(key=lambda tup: float(tup[1]))
-    return initiationLog, falseTrackIdSet
+
+    falseInitiationLog = _getFalseInitiationLog(runElement, falseTrackIdSet)
+
+    return initiationLog, falseInitiationLog
 
 
 def _compareTrackList(trueTrackStateList, estimatedStateList, threshold):
@@ -181,11 +186,11 @@ def _compareTrackList(trueTrackStateList, estimatedStateList, threshold):
 
     assert len(timeMatch) == len(trueTrackSlice) == len(estimatedTrackSlice)
 
-    goodTimeMatch, meanSquaredError, lostTrack = _compareTrackSlices(
+    goodTimeMatch, rmsError, lostTrack = _compareTrackSlices(
         timeMatch,trueTrackSlice,estimatedTrackSlice,threshold)
 
     if lostTrack is not None:
-        return (timeMatch, goodTimeMatch, meanSquaredError, lostTrack)
+        return (timeMatch, goodTimeMatch, rmsError, lostTrack)
 
     return ([],[],np.nan, None)
 
@@ -227,8 +232,8 @@ def _storeMatchList(run, matchList):
     for match in matchList:
         (trueTrackID,
          estimatedTrackID,
-         meanSquaredError,
-         smoothedMeanSquaredError,
+         rmsError,
+         smoothedRmsError,
          lostTrack,
          timeMatch,
          goodTimeMatch,
@@ -248,23 +253,21 @@ def _storeMatchList(run, matchList):
         trackElement.set(goodtimematchlengthTag, str(goodTimeMatchLength))
         trackElement.set(trackpercentTag, "{:.1f}".format(trackPercent))
 
-        statesElement.set(meansquarederrorTag, "{:.4f}".format(meanSquaredError))
-        smoothedStatesElement.set(meansquarederrorTag, "{:.4f}".format(smoothedMeanSquaredError))
+        statesElement.set(rmserrorTag, "{:.4f}".format(rmsError))
+        smoothedStatesElement.set(rmserrorTag, "{:.4f}".format(smoothedRmsError))
 
 
-def _storeInitializationLog(runElement, initiationLog):
-
-    #TODO: Store cpmf as one Element with a list
-    #TODO: Store false accumulation as one Element with a list
+def _storeInitializationLog(runElement, initiationLog, falseInitiationLog):
     initiationLogElement = ET.SubElement(runElement, initializationLogTag)
-    for element in initiationLog:
-        assert type(element[0]) == str
-        assert type(element[1]) == str
-        ET.SubElement(initiationLogElement,
-                      initialtargetTag,
-                      attrib={idTag:element[1],
-                              timeTag:element[0]})
 
+    from collections import Counter
+    count = Counter([e[0] for e in  initiationLog])
+    count_list = [(i, count[i]) for i in count]
+    count_list.sort(key=lambda tup: float(tup[0]))
+    ET.SubElement(initiationLogElement, correctInitialTargetsTag).text = str(count_list)
+
+    falseInitList = [(str(time),falseInitiationLog[time]) for time in sorted(falseInitiationLog)]
+    ET.SubElement(initiationLogElement, falseTargetsTag).text = str(falseInitList)
 
 def _timeMatch(trueTrackStateList, estimatedStateList):
     trueTrackTimeList = [e.get(timeTag) for e in trueTrackStateList]
@@ -272,6 +275,27 @@ def _timeMatch(trueTrackStateList, estimatedStateList):
     commonTimes = [tT for tT in trueTrackTimeList if tT in estimatedTrackTimeList]
     return commonTimes
 
+
+def _getFalseInitiationLog(runElement, falseTrackIdSet):
+    falseInitiationLog = {}
+    for falseTrackId in falseTrackIdSet:
+        trackElement = runElement.find('Track[@id="{:}"]'.format(falseTrackId))
+        statesElement = trackElement.find(statesTag)
+        stateList = statesElement.findall(stateTag)
+        startTime = stateList[0].get(timeTag)
+        endTime = stateList[-1].get(timeTag) if trackElement.get(terminatedTag, "False") == "True" else None
+
+        startTime = float(startTime)
+        if startTime not in falseInitiationLog:
+            falseInitiationLog[startTime] = [0, 0]
+        falseInitiationLog[startTime][0] += 1
+
+        if endTime is not None:
+            endTime = float(endTime)
+            if endTime not in falseInitiationLog:
+                falseInitiationLog[endTime] = [0, 0]
+            falseInitiationLog[endTime][1] -= 1
+    return falseInitiationLog
 
 def _parsePosition(positionElement):
     north = positionElement.find(northTag).text

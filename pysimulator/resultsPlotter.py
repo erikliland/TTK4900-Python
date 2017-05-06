@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from pymht.utils.xmlDefinitions import *
 import os
 import numpy as np
+import ast
 
 
 def plotTrackLoss(loadFilePath):
@@ -30,7 +31,7 @@ def plotTrackingPercentage(loadFilePath):
     scenarioSettingsElement = scenarioElement.find(scenariosettingsTag)
     variationsElement = scenarioElement.findall('.Variations[@preinitialized="True"]')[0]
     plotData = _getTrackingPercentagePlotData(groundtruthElement, variationsElement)
-    print("plotData", plotData)
+    # print("plotData", plotData)
     figure = _plotTrackingPercentage(plotData)
     figure.savefig(savePath)
 
@@ -129,19 +130,30 @@ def _getInitializationTimePlotData(variationsElement):
         N_init = variationElement.get(nInitTag)
         P_d = variationElement.get(pdTag)
         lambda_phi = variationElement.get(lambdaphiTag)
-        initTimeLog = dict()
-        runElementList = variationElement.findall(runTag)[0:1]
+        correctInitTimeLog = dict()
+        falseInitTimeLog = dict()
+        runElementList = variationElement.findall(runTag)
         for run in runElementList:
             initiationLogElement = run.find(initializationLogTag)
-            initialTargetList = initiationLogElement.findall(initialtargetTag)
-            for e in initialTargetList:
-                time = e.get(timeTag)
-                if time in initTimeLog:
-                    initTimeLog[time] += 1
-                else:
-                    initTimeLog[time] = 1
-        for k,v in initTimeLog.items():
-            initTimeLog[k] = float(v) / float(len(runElementList))
+            correctTargetsElement = initiationLogElement.find(correctInitialTargetsTag)
+            correctsTargetsList = ast.literal_eval(correctTargetsElement.text)
+            for time, amount in correctsTargetsList:
+                if time not in correctInitTimeLog:
+                    correctInitTimeLog[time] = 0
+                correctInitTimeLog[time] += amount
+
+            falseTargetsElement = initiationLogElement.find(falseTargetsTag)
+            falseTargetsList = ast.literal_eval(falseTargetsElement.text)
+            for time, change in falseTargetsList:
+                if time not in falseInitTimeLog:
+                    falseInitTimeLog[time] = 0
+                falseInitTimeLog[time] += change[0]
+
+        for k,v in correctInitTimeLog.items():
+            correctInitTimeLog[k] = float(v) / float(len(runElementList))
+
+        for k,v in falseInitTimeLog.items():
+            falseInitTimeLog[k] = float(v) / float(len(runElementList))
 
         #TODO: http://stackoverflow.com/questions/14692690/access-nested-dictionary-items-via-a-list-of-keys
         if M_init not in variationsInitLog:
@@ -151,7 +163,7 @@ def _getInitializationTimePlotData(variationsElement):
         if lambda_phi not in variationsInitLog[M_init][N_init]:
             variationsInitLog[M_init][N_init][lambda_phi] = {}
         if P_d not in variationsInitLog[M_init][N_init][lambda_phi]:
-            variationsInitLog[M_init][N_init][lambda_phi][P_d] = initTimeLog
+            variationsInitLog[M_init][N_init][lambda_phi][P_d] = (correctInitTimeLog, falseInitTimeLog)
         else:
             raise KeyError("Duplicate key found")
 
@@ -289,42 +301,71 @@ def _plotInitializationTime3D(plotData, loadFilePath, simLength, timeStep, nTarg
             plt.close()
 
 def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTargets):
+    timeArray = np.arange(0, simLength, timeStep)
     for M_init, d1 in plotData.items():
         for N_init, d2 in d1.items():
-            figure = plt.figure(figsize=(10, 10), dpi=100)
-            ax = figure.add_subplot(111)
-            lambdaPhiSet = set()
+            figure = plt.figure(figsize=(10, 14), dpi=100)
+            ax1 = figure.add_subplot(211)
+            ax2 = figure.add_subplot(212)
             colors = sns.color_palette(n_colors=5)
-            linestyle = ['-','--','-.',]
+            linestyle = ['-','--','-.']
             sns.set_style(style='white')
             savePath = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
+            cpfmList = []
+            falseCPFMlist = []
             for k, (lambda_phi, d3) in enumerate(d2.items()):
-                lambdaPhiSet.add(float(lambda_phi))
-                for j, (P_d, initTimeLog) in enumerate(d3.items()):
-                    timeArray = np.arange(0, simLength, timeStep)
+                for j, (P_d, (correctInitTimeLog, falseInitTimeLog)) in enumerate(d3.items()):
+                    falsePFM = np.zeros_like(timeArray)
                     pmf = np.zeros_like(timeArray)
                     for i, time in enumerate(timeArray):
-                        if str(time) in initTimeLog:
-                            pmf[i] = initTimeLog[str(time)]
+                        if str(time) in correctInitTimeLog:
+                            pmf[i] = correctInitTimeLog[str(time)]
+                        if str(time) in falseInitTimeLog:
+                            falsePFM[i] = falseInitTimeLog[str(time)]
                     cpmf = np.cumsum(pmf) / float(nTargets)
-                    ax.plot(timeArray,
-                            cpmf,
-                            label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
-                            c=colors[j],
-                            linestyle=linestyle[k])
-            ax.set_ylim(0,1)
-            plt.xlabel("Time steps", fontsize=18, linespacing=2)
-            plt.ylabel("cpfm", fontsize=18, linespacing=3)
-            plt.title("M={0:}, N={1:}".format(M_init, N_init), fontsize=18)
-            handles, labels = ax.get_legend_handles_labels()
-            import operator
-            hl = sorted(zip(handles, labels),
-                        key=operator.itemgetter(1),
-                        reverse=True)
-            handles2, labels2 = zip(*hl)
+                    falseCPFM = np.cumsum(falsePFM)
+                    cpfmList.append((P_d, lambda_phi, cpmf))
+                    falseCPFMlist.append((P_d, lambda_phi, falseCPFM))
+            cpfmList.sort(key=lambda tup: float(tup[1]))
+            cpfmList.sort(key=lambda tup: float(tup[0]), reverse=True)
+
+            falseCPFMlist.sort(key=lambda tup: float(tup[1]))
+            falseCPFMlist.sort(key=lambda tup: float(tup[0]), reverse=True)
+
+            pdSet = set()
+            lambdaPhiSet = set()
+            for P_d, lambda_phi, cpmf in cpfmList:
+                if P_d not in pdSet:
+                    lambdaPhiSet.clear()
+                pdSet.add(P_d)
+                lambdaPhiSet.add(lambda_phi)
+                ax1.plot(timeArray,
+                        cpmf,
+                        label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
+                        c=colors[len(pdSet)-1],
+                        linestyle=linestyle[len(lambdaPhiSet)-1])
+
+            pdSet = set()
+            lambdaPhiSet = set()
+            for P_d, lambda_phi, cpmf in falseCPFMlist:
+                if P_d not in pdSet:
+                    lambdaPhiSet.clear()
+                pdSet.add(P_d)
+                lambdaPhiSet.add(lambda_phi)
+                ax2.plot(timeArray,
+                        cpmf,
+                        label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
+                        c=colors[len(pdSet)-1],
+                        linestyle=linestyle[len(lambdaPhiSet)-1])
+
+            ax2.set_ylim(0,60)
+            ax1.set_xlabel("Time steps", fontsize=18, linespacing=2)
+            ax1.set_ylabel("cpfm", fontsize=18, linespacing=3)
+            ax1.set_title("M={0:}, N={1:}".format(M_init, N_init), fontsize=18)
             plt.grid(False)
-            ax.legend(handles2, labels2, loc=4)
-            sns.despine(ax=ax, offset=0)
+            ax1.legend(loc=4)
+            ax2.legend(loc=2)
+            sns.despine(ax=ax1, offset=0)
             plt.savefig(savePath)
             plt.close()
 
