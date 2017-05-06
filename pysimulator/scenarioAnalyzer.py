@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 from pymht.utils.xmlDefinitions import *
+from pymht.initiators.m_of_n import _solve_global_nearest_neighbour
 import numpy as np
 
 
@@ -25,8 +26,9 @@ def analyzeTrackingFile(filePath):
 
 def analyzeInitFile(filePath):
     print("Starting:", filePath)
-    tree = ET.parse(filePath)
-    threshold = 15
+    tree = ET.ElementTree()
+    tree.parse(filePath)
+    threshold = 5
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
     scenariosettingsElement = scenarioElement.find(scenariosettingsTag)
@@ -51,9 +53,7 @@ def analyzeVariationsTrackingPerformance(groundtruthList, variationsElement, thr
 
 def analyzeVariationsInitializationPerformance(groundtruthList, variationsElement, threshold):
     variationList = variationsElement.findall(variationTag)
-
-    for variation in variationList[0:1]:
-        print("Analyzing variation", variation.attrib)
+    for variation in variationList:
         analyzeVariationInitializationPerformance(groundtruthList, variation, threshold)
 
 
@@ -67,11 +67,11 @@ def analyzeVariationTrackLossPerformance(groundtruthList, variation, threshold):
 
 def analyzeVariationInitializationPerformance(groundtruthList, variation, threshold):
     runList = variation.findall(runTag)
-    for run in runList:
-        estimateTrackList = run.findall(trackTag)
-        matchList = _matchAndTimeInitialTracks(groundtruthList, estimateTrackList, threshold)
-        # print("matchList", matchList)
-        # storeMatchList(run, matchList)
+    for runElement in runList:
+        estimateTrackList = runElement.findall(trackTag)
+        initiationLog, falseTrackIdSet = _matchAndTimeInitialTracks(groundtruthList, estimateTrackList, threshold)
+        print("falseTrackIdSet",falseTrackIdSet)
+        _storeInitializationLog(runElement, initiationLog)
 
 
 def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
@@ -115,17 +115,57 @@ def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
 
 
 def _matchAndTimeInitialTracks(groundtruthList, estimateTrackList, threshold):
+    trueTrackList = []
     for trueTrack in groundtruthList:
         trueTrackStatesElement = trueTrack.find(statesTag)
-        trueTrackStateList = trueTrackStatesElement.findall(stateTag)
         trueTrackID = trueTrack.get(idTag)
-        for estimatedTrack in estimateTrackList:
-            estimatedTrackID = estimatedTrack.get(idTag)
-            estimatedTrackStatesElement = estimatedTrack.find(statesTag)
+        trueTrackStateList = trueTrackStatesElement.findall(stateTag)
+        for stateElement in trueTrackStateList:
+            trueTrackTime = stateElement.get(timeTag)
+            try:
+                index = [t[0] for t in trueTrackList].index(trueTrackTime)
+            except ValueError:
+                trueTrackList.append((trueTrackTime, []))
+                index = len(trueTrackList)-1
+            trueTrackList[index][1].append((trueTrackID, stateElement))
+    trueTrackList.sort(key=lambda tup: float(tup[0]))
 
+    falseTrackIdSet = set()
+    firstStateList = []
+    for estimatedTrack in estimateTrackList:
+        estimatedTrackID = estimatedTrack.get(idTag)
+        falseTrackIdSet.add(estimatedTrackID)
+        estimatedTrackStatesElement = estimatedTrack.find(statesTag)
+        firstStateElement = estimatedTrackStatesElement.find(stateTag)
+        stateTime = firstStateElement.get(timeTag)
+        firstStateList.append((stateTime, estimatedTrackID, firstStateElement))
+    firstStateList.sort(key=lambda tup: float(tup[0]))
 
-
-
+    initiationLog = []
+    initiatedTracks = set()
+    for (time, trackTupleList) in trueTrackList:
+        newTracks = [s for s in firstStateList
+                     if s[0] == time]
+        uninitiatedTracks = [s for s in trackTupleList
+                             if s[0] not in initiatedTracks]
+        nNewTracks= len(newTracks)
+        nUninitializedTracks = len(uninitiatedTracks)
+        if nNewTracks == 0 or nUninitializedTracks == 0:
+            continue
+        deltaMatrix = np.zeros((nNewTracks, nUninitializedTracks))
+        for i, initiator in enumerate(newTracks):
+            for j, (id, stateElement) in enumerate(uninitiatedTracks):
+                distance = np.linalg.norm(_parsePosition(initiator[2].find(positionTag)) -
+                                          _parsePosition(stateElement.find(positionTag)))
+                deltaMatrix[i,j] = distance
+        deltaMatrix[deltaMatrix>threshold] = np.inf
+        associations = _solve_global_nearest_neighbour(deltaMatrix)
+        for initIndex, trackIndex in associations:
+            initiatedTracks.add(uninitiatedTracks[trackIndex][0])
+            falseTrackIdSet.remove(str(newTracks[initIndex][1]))
+            initiationLog.append((time, uninitiatedTracks[trackIndex][0]))
+    initiationLog.sort(key=lambda tup: float(tup[1]))
+    return initiationLog, falseTrackIdSet
 
 
 def _compareTrackList(trueTrackStateList, estimatedStateList, threshold):
@@ -176,8 +216,9 @@ def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshol
     meanSquaredError = np.mean(np.array(delta2List))
 
     if (len(goodTimeMatch) > 0) and not np.isnan(meanSquaredError):
+        rmsError = np.sqrt(meanSquaredError)
         lostTrack = goodTimeMatch < timeMatch
-        return (goodTimeMatch, meanSquaredError, lostTrack)
+        return (goodTimeMatch, rmsError, lostTrack)
 
     return ([], np.nan, None)
 
@@ -209,6 +250,20 @@ def _storeMatchList(run, matchList):
 
         statesElement.set(meansquarederrorTag, "{:.4f}".format(meanSquaredError))
         smoothedStatesElement.set(meansquarederrorTag, "{:.4f}".format(smoothedMeanSquaredError))
+
+
+def _storeInitializationLog(runElement, initiationLog):
+
+    #TODO: Store cpmf as one Element with a list
+    #TODO: Store false accumulation as one Element with a list
+    initiationLogElement = ET.SubElement(runElement, initializationLogTag)
+    for element in initiationLog:
+        assert type(element[0]) == str
+        assert type(element[1]) == str
+        ET.SubElement(initiationLogElement,
+                      initialtargetTag,
+                      attrib={idTag:element[1],
+                              timeTag:element[0]})
 
 
 def _timeMatch(trueTrackStateList, estimatedStateList):
