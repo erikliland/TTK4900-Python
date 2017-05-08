@@ -71,7 +71,6 @@ def analyzeVariationInitializationPerformance(groundtruthList, variation, thresh
         for initiationLogElement in runElement.findall(initializationLogTag):
             runElement.remove(initiationLogElement)
         initiationLog, falseInitiationLog = _matchAndTimeInitialTracks(groundtruthList, runElement, threshold)
-        # print("falseInitiationLog",falseInitiationLog)
         _storeInitializationLog(runElement, initiationLog, falseInitiationLog)
 
 
