@@ -1,9 +1,1 @@
-data/ filter=lfs diff=lfs merge=lfs -text
-data/Scenario4_Init.xml filter=lfs diff=lfs merge=lfs -text
-data/Scenario4_Tracking.xml filter=lfs diff=lfs merge=lfs -text
-data/Scenario1_Init.xml filter=lfs diff=lfs merge=lfs -text
-data/Scenario1_Tracking.xml filter=lfs diff=lfs merge=lfs -text
-data/Scenario2_Init.xml filter=lfs diff=lfs merge=lfs -text
-data/Scenario2_Tracking.xml filter=lfs diff=lfs merge=lfs -text
-data/Scenario3_Init.xml filter=lfs diff=lfs merge=lfs -text
-data/Scenario3_Tracking.xml filter=lfs diff=lfs merge=lfs -text
+
