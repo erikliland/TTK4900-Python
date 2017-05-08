@@ -84,5 +84,5 @@ def mainMulti():
 
 
 if __name__ == '__main__':
-    runScenariosMultiProcessing([], initFilePathList[0:1], scenarioList,
+    runScenariosMultiProcessing(trackingFilePathList, initFilePathList, scenarioList,
                                 pdList, lambdaphiList, nList, M_N_list, nMonteCarlo)
