@@ -72,7 +72,7 @@ class Scenario(ScenarioBase):
                                    self.simulationTimeStep,
                                    model)
 
-    def getSimulatedScenario(self, seed, simList, lambda_phi, P_d):
+    def getSimulatedScenario(self, seed, simList, lambda_phi, P_d, **kwargs):
         sim.seed_simulator(seed)
 
         scanList = sim.simulateScans(simList,
@@ -82,7 +82,8 @@ class Scenario(ScenarioBase):
                                      lambda_phi,
                                      self.radarRange,
                                      self.p0,
-                                     P_d=P_d)
+                                     P_d=P_d,
+                                     **kwargs)
 
         aisList = sim.simulateAIS(simList,
                                   model.Phi,
@@ -90,8 +91,28 @@ class Scenario(ScenarioBase):
                                   model.R_AIS(model.sigmaR_AIS_true),
                                   model.GPS_COVARIANCE_PRECISE,
                                   self.radarPeriod,
-                                  self.initTime)
+                                  self.initTime,
+                                  **kwargs)
         return scanList, aisList
+
+# Scenario 0
+scenario1 = Scenario("Scenario0")
+scenario1.add([-2000, 2100, 4, -4])
+scenario1.add([100, -2000, -2, 8])
+scenario1.add([-4000, 300, 12, -1])
+scenario1.add([-4000, 0, 12, 0])
+scenario1.add([-4000, -200, 17, 1])
+scenario1.add([4000, -2000, 1, -8])
+scenario1.add([3000, 4000, 2, -8])
+scenario1.add([200, 5000, 10, -1])
+scenario1.add([-3500, -3500, 10, 5])
+scenario1.add([-4100, 3200, 17, 2])
+scenario1.add([3600, 3000, -10, 3])
+scenario1.add([5000, 1000, -7, -2])
+scenario1.add([2000, 100, -10, 8])
+scenario1.add([0, -5000, 10, 2])
+scenario1.add([-400, 300, 17, 0])
+scenario1.add([0, 2000, 15, 15])
 
 # Scenario 1
 scenario1 = Scenario("Scenario1")
@@ -169,4 +190,4 @@ scenario4.add([0, -5000, 10, 2], mmsi=257114413, aisClass='A')
 scenario4.add([-400, 300, 17, 0], mmsi=257304914, aisClass='A')
 scenario4.add([0, 2000, 15, 15], mmsi=257114415, aisClass='A')
 
-scenarioList = [scenario1, scenario2, scenario3, scenario4]
+scenarioList = [scenario0, scenario1, scenario2, scenario3, scenario4]

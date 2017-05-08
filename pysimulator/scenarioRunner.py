@@ -45,7 +45,7 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
                 print("variationElement", variationElement.attrib)
                 runMonteCarloSimulations(
                     variationElement, scenario, simList, nMonteCarlo, baseSeed,
-                    variationDict, preInitialized=True, **kwargs)
+                    variationDict, True, **kwargs)
 
     _renameOldFiles(path)
     hpf.writeElementToFile(path, scenarioElement)
@@ -83,14 +83,13 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
                 variationElement = variationsElement.find(
                     '.Variation[@M_init="{0:}"][@N_init="{1:}"][@Pd="{2:}"][@lambda_phi="{3:}"]'.format(M, N, P_d, lambda_phi))
                 if variationElement is None:
-                    # print("Creating variationElement", P_d, N, lambda_phi)
                     variationElement = ET.SubElement(
                         variationsElement, variationTag,
                         attrib={str(k): str(v) for k, v in variationDict.items()})
                 print("variationElement", variationElement.attrib)
                 runMonteCarloSimulations(
                     variationElement, scenario, simList, nMonteCarlo, baseSeed,
-                    variationDict, preInitialized=False, **kwargs)
+                    variationDict, False, **kwargs)
 
     _renameOldFiles(path)
     hpf.writeElementToFile(path, scenarioElement)
@@ -129,21 +128,18 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
     if trackersettingsElement is None:
         storeTrackerData(variationElement, trackerArgs, trackerKwargs)
     for i in range(nSim):
-        # print("i", i)
         runElement = variationElement.find('Run[@iteration="{:}"]'.format(i+1))
         if runElement is not None:
-            # print("Skipping")
             continue
         if kwargs.get('printLog', True):
             print("Running scenario iteration", i, end="", flush=True)
         seed = baseSeed + i
-        scanList, aisList = scenario.getSimulatedScenario(seed, simList, lambda_phi, P_d)
+        scanList, aisList = scenario.getSimulatedScenario(seed, simList, lambda_phi, P_d,
+                                                          localClutter=False)
 
         try:
-            # print("Running", variationDict)
             runSimulation(variationElement, simList, scanList, aisList, trackerArgs,
-                          trackerKwargs, preInitialized,
-                          seed=seed, **kwargs)
+                          trackerKwargs, preInitialized,seed=seed, **kwargs)
         except Exception as e:
             import traceback
             print("Scenario:", scenario.name)
@@ -165,10 +161,10 @@ def runSimulation(variationElement, simList, scanList, aisList, trackerArgs,
     for measurementList in scanList[startIndex:]:
         scanTime = measurementList.time
         aisPredictions = aisList.getMeasurements(scanTime)
-        tracker.addMeasurementList(measurementList, aisPredictions)
+        tracker.addMeasurementList(measurementList, aisPredictions, pruneSimilar=not preInitialized)
         if kwargs.get('printLog', True):
             print('.', end="", flush=True)
-    tracker._storeRun(variationElement, **kwargs)
+    tracker._storeRun(variationElement, preInitialized, **kwargs)
     if kwargs.get('printLog', True):
         print()
 

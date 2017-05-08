@@ -35,7 +35,7 @@ def initWorker(scenarioIndex, filePath, pdList, lambdaphiList, M_N_list, nMonteC
 
 def runScenariosMultiProcessing(filePathList, initFilePathList, scenarios,
                                 pdList, lambdaphiList, nList, M_N_list, nMonteCarlo):
-    nProcesses = 2
+    nProcesses = 8
     pool = mp.Pool(processes=nProcesses)
 
     results = []
@@ -84,5 +84,5 @@ def mainMulti():
 
 
 if __name__ == '__main__':
-    runScenariosMultiProcessing(trackingFilePathList, initFilePathList, scenarioList,
+    runScenariosMultiProcessing([], initFilePathList[0:1], scenarioList,
                                 pdList, lambdaphiList, nList, M_N_list, nMonteCarlo)
