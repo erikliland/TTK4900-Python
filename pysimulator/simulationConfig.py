@@ -11,3 +11,5 @@ trackingFilePathList = [os.path.join(path, scenario.name + "_Tracking" + ".xml")
 initFilePathList = [os.path.join(path, scenario.name + "_Init" + ".xml") for scenario in scenarioList]
 baseSeed = 5446
 M_N_list = [(1,1),(1,2),(1,3),(1,4),(2,2),(2,3),(2,4),(2,5),(3,3),(3,4),(3,5),(3,6)]
+
+acceptThreshold = 15 #meter
