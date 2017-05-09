@@ -19,7 +19,7 @@ def runSimulation(**kwargs):
 
     scenario = simulationConfig.scenarioList[0]
 
-    seed = simulationConfig.baseSeed + 0
+    seed = simulationConfig.baseSeed + 1
     # p0 = np.array([100., -100.])
     # radarRange = 5500.0  # meters
     # maxSpeed = 22.0  # meters / second
@@ -33,7 +33,7 @@ def runSimulation(**kwargs):
     lambda_phi = 4e-6
     # lambda_nu = 0.0002
     P_d = 0.6  # Probability of detection
-    N = 6  # Number of  timesteps to tail (N-scan)
+    N = 1  # Number of  timesteps to tail (N-scan)
     # eta2 = 5.99  # 95% confidence
     #
     # assert simulationTimeStep <= radarPeriod
@@ -159,6 +159,8 @@ def runSimulation(**kwargs):
                                        printAssociation=False,
                                        printCluster=False,
                                        checkIntegrity=True,
+                                       dynamicWindow=False,
+                                       pruneSimilar=True,
                                        **kwargs)
             toc = time.time() - tic
             # print("H",tracker.__trackNodes__[7].measurementNumber,": ",tracker.__trackNodes__[7].cumulativeNLLR)
@@ -218,7 +220,7 @@ def runSimulation(**kwargs):
         # tracker.plotValidationRegionFromTracks() # TODO: Does not work
         desiredPlotPeriod = scenario.radarPeriod
         markEvery = max(1, int(desiredPlotPeriod / scenario.simulationTimeStep))
-        hpf.plotTrueTrack(simList, colors=colors1, markevery=markEvery)
+        hpf.plotTrueTrack(simList, colors=colors1, markevery=markEvery, label=True)
         # tracker.plotMeasurementsFromRoot(dummy=False, real = False, includeHistory=False)
         # tracker.plotStatesFromRoot(dummy=False, real=False, ais=True)
         # tracker.plotMeasurementsFromTracks(labels = False, dummy = True, real = True)
@@ -232,7 +234,7 @@ def runSimulation(**kwargs):
         # tracker.plotActiveTracks(colors=colors2, markInitial=False, markRoot=False, markStates=False, real=False,
         #                          dummy=False, ais=False, smooth=True, markEnd=False)
 
-        tracker.plotTerminatedTracks(markStates=False, real=False, dummy=False, ais=True)
+        # tracker.plotTerminatedTracks(markStates=False, real=False, dummy=False, ais=True)
         plt.axis("equal")
         plt.xlim((scenario.p0[0] - scenario.radarRange * 1.05,
                   scenario.p0[0] + scenario.radarRange * 1.05))
