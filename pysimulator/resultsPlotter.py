@@ -1,13 +1,66 @@
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 from mpl_toolkits.mplot3d import Axes3D
-import seaborn as sns
+import seaborn.apionly as sns
 import xml.etree.ElementTree as ET
 from pymht.utils.xmlDefinitions import *
 import os
 import numpy as np
+import csv
 import ast
+import simulationConfig
+from pysimulator.scenarios.scenarios import scenarioList
 
+
+def exportInitialState():
+    filePath = os.path.join(simulationConfig.path, 'plots', "Scenario_Initial_State.csv")
+    with open(filePath, 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["T", "NP", "EP", "NS", "ES"])
+        scenario = scenarioList[0]
+        for i, target in enumerate(scenario.initialTargets):
+            s = target.state
+            row = [str(i), str(s[1]), str(s[0]), str(s[3]), str(s[2])]
+            writer.writerow(row)
+
+def exportAisState():
+    filePath = os.path.join(simulationConfig.path, 'plots', "Scenario_AIS_State.csv")
+    with open(filePath, 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        nScenario = len(scenarioList)
+        nTargets = len(scenarioList[0].initialTargets)
+        headerList = ["T"]
+        headerList.extend( ["S{:}".format(i) for i in range(nScenario)] )
+        print(headerList)
+        writer.writerow(headerList)
+
+        for i in range(nTargets):
+            aisList = []
+            for j in range(nScenario):
+                if scenarioList[j].initialTargets[i].mmsi is not None:
+                    aisList.append(scenarioList[j].initialTargets[i].aisClass)
+                else:
+                    aisList.append('-')
+            row = [str(i)].extend(aisList)
+            writer.writerow(row)
+
+def plotTrueTracks():
+    import matplotlib.cm as cm
+    import itertools
+    import pymht.utils.helpFunctions as hpf
+    scenario = scenarioList[0]
+    colors1 = itertools.cycle(cm.rainbow(np.linspace(0, 1, len(scenario))))
+    simList = scenario.getSimList()
+    figure = plt.figure(num=1, figsize=(9, 9), dpi=90)
+    hpf.plotTrueTrack(simList, colors=colors1, label=True, markevery=10)
+    hpf.plotRadarOutline(scenario.p0, scenario.radarRange, markCenter=False)
+    plt.xlabel("East [m]")
+    plt.ylabel("North [m]")
+    plt.title("True tracks", fontsize=18)
+    plt.grid(True)
+    plt.tight_layout()
+    filePath = os.path.join(simulationConfig.path, 'plots', "ScenarioTruth.pdf")
+    figure.savefig(filePath)
 
 def plotTrackLoss(loadFilePath):
     print("plotTrackLoss", loadFilePath)
@@ -304,11 +357,12 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
     timeArray = np.arange(0, simLength, timeStep)
     for M_init, d1 in plotData.items():
         for N_init, d2 in d1.items():
-            figure = plt.figure(figsize=(10, 14), dpi=100)
-            ax1 = figure.add_subplot(211)
-            ax2 = figure.add_subplot(212)
+            figure1 = plt.figure(figsize=(10, 14), dpi=100)
+            ax1 = figure1.add_subplot(211)
+            ax2 = figure1.add_subplot(212)
+            figure2 = plt.figure(figsize=(10,10), dpi=100)
             colors = sns.color_palette(n_colors=5)
-            linestyle = ['-','--','-.']
+            linestyleList = ['-','--','-.']
             sns.set_style(style='white')
             savePath = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
             cpfmList = []
@@ -343,7 +397,7 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                         cpmf,
                         label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                         c=colors[len(pdSet)-1],
-                        linestyle=linestyle[len(lambdaPhiSet)-1])
+                        linestyle=linestyleList[len(lambdaPhiSet)-1])
 
             pdSet = set()
             lambdaPhiSet = set()
@@ -356,7 +410,7 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                         cpmf,
                         label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                         c=colors[len(pdSet)-1],
-                        linestyle=linestyle[len(lambdaPhiSet)-1])
+                        linestyle=linestyleList[len(lambdaPhiSet)-1])
 
             ax2.set_ylim(0,60)
             ax1.set_xlabel("Time steps", fontsize=18, linespacing=2)

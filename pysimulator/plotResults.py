@@ -3,6 +3,9 @@ import multiprocessing as mp
 
 
 def plotResults(filePathList, initFilePathList):
+    resultsPlotter.plotTrueTracks()
+    resultsPlotter.exportInitialState()
+    resultsPlotter.exportAisState()
     with mp.Pool() as pool:
         pool.map(resultsPlotter.plotTrackLoss, filePathList)
         pool.map(resultsPlotter.plotTrackingPercentage, filePathList)
