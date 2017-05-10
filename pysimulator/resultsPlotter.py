@@ -339,11 +339,11 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
     for M_init, d1 in plotData.items():
         for N_init, d2 in d1.items():
             figure1 = plt.figure(figsize=(10, 14), dpi=100)
-            figure2 = plt.figure(figsize=(10, 6), dpi=100)
+            # figure2 = plt.figure(figsize=(10, 6), dpi=100)
 
-            ax11 = figure1.add_subplot(211)
-            ax12 = figure1.add_subplot(212)
-            ax21 = figure2.add_subplot(111)
+            ax11 = figure1.add_subplot(311)
+            ax12 = figure1.add_subplot(312)
+            ax13 = figure1.add_subplot(313)
             colors = sns.color_palette(n_colors=5)
             linestyleList = ['-','--','-.']
             sns.set_style(style='white')
@@ -398,8 +398,8 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                     lambdaPhiSet.clear()
                 pdSet.add(P_d)
                 lambdaPhiSet.add(lambda_phi)
-                ax12.plot(timeArray,
-                        cpmf,
+                ax12.semilogy(timeArray,
+                        cpmf+(1e-10),
                         label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                         c=colors[len(pdSet)-1],
                         linestyle=linestyleList[len(lambdaPhiSet)-1])
@@ -411,42 +411,37 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                     lambdaPhiSet.clear()
                 pdSet.add(P_d)
                 lambdaPhiSet.add(lambda_phi)
-                ax21.plot(timeArray,
+                ax13.plot(timeArray,
                           accFalseTrack,
                          label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                          c=colors[len(pdSet) - 1],
                          linestyle=linestyleList[len(lambdaPhiSet) - 1])
 
-            ax11.set_xlabel("Time [s]", fontsize=18, linespacing=2)
-            ax11.set_ylabel("cpfm", fontsize=18, linespacing=3)
-            ax11.set_title("M={0:}, N={1:}".format(M_init, N_init), fontsize=18)
+            ax11.set_xlabel("Time [s]", fontsize=14)
+            ax11.set_ylabel("Average cpfm", fontsize=14, linespacing=3)
+            ax11.set_title("Cumulative Probability Mass Function", fontsize=18)
             ax11.legend(loc=4)
             ax11.grid(False)
+            ax11.set_ylim(0,1)
             sns.despine(ax=ax11, offset=0)
 
-            ax12.set_xlabel("Time [s]", fontsize=18, linespacing=2)
-            ax12.set_ylabel("Number of tracks", fontsize=18, linespacing=2)
+            ax12.set_xlabel("Time [s]", fontsize=14)
+            ax12.set_ylabel("Average number of tracks", fontsize=14, linespacing=2)
             ax12.set_title("Accumulative number of erroneous tracks", fontsize=18)
-            ax12.set_ylim(0,60)
-            ax12.legend(loc=2)
+            ax12.set_ylim(1e-2,60)
             ax12.grid(False)
             sns.despine(ax=ax12, offset=0)
 
-            ax21.set_xlabel("Time [s]", fontsize=18, linespacing=2)
-            ax21.set_ylabel("Number of tracks", fontsize=18, linespacing=2)
-            ax21.set_title("M={0:}, N={1:}".format(M_init, N_init), fontsize=18)
-            ax21.legend(loc=2)
-            ax21.grid(False)
-            ax21.set_ylim(-0.02, max(1,ax21.get_ylim()[1]))
-            sns.despine(ax=ax21, offset=0)
+            ax13.set_xlabel("Time [s]", fontsize=14)
+            ax13.set_ylabel("Average number of tracks", fontsize=14, linespacing=2)
+            ax13.set_title("Number of erroneous tracks alive", fontsize=18)
+            ax13.grid(False)
+            ax13.set_ylim(-0.02, max(1,ax13.get_ylim()[1]))
+            sns.despine(ax=ax13, offset=0)
 
             figure1.tight_layout()
             figure1.savefig(savePath1)
             figure1.clf()
-
-            figure2.tight_layout()
-            figure2.savefig(savePath2)
-            figure2.clf()
 
             plt.close()
 
