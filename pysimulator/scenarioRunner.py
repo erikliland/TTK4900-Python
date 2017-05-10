@@ -22,7 +22,7 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
         simList.storeGroundTruth(scenarioElement, scenario)
         scenario.storeScenarioSettings(scenarioElement)
 
-    variationsElement = scenarioElement.find('.Variations[@preinitialized="True"]')
+    variationsElement = scenarioElement.find('.{0:}[@{1:}="True"]'.format(variationsTag, preinitializedTag))
 
     if variationsElement is None:
         print("Creating variationsElement", True)
@@ -36,9 +36,10 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
                                  lambdaphiTag: lambda_phi,
                                  nTag: N}
                 variationElement = variationsElement.find(
-                    '.Variation[@N="{0:}"][@Pd="{1:}"][@lambda_phi="{2:}"]'.format(N, P_d, lambda_phi))
+                    '.{0:}[@{1:}="{4:}"][@{2:}="{5:}"][@{3:}="{6:}"]'.format(
+                        variationTag, nTag, pdTag, lambdaphiTag, N, P_d, lambda_phi))
                 if variationElement is None:
-                    print("Creating variationElement", P_d, N, lambda_phi)
+                    print("Creating variationElement", variationDict)
                     variationElement = ET.SubElement(
                         variationsElement, variationTag,
                         attrib={str(k): str(v) for k, v in variationDict.items()})
@@ -65,7 +66,8 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
         simList.storeGroundTruth(scenarioElement, scenario)
         scenario.storeScenarioSettings(scenarioElement)
 
-    variationsElement = scenarioElement.find('.Variations[@preinitialized="False"]')
+    variationsElement = scenarioElement.find(
+        '.{0:}[@{1:}="False"]'.format(variationsTag, preinitializedTag))
 
     if variationsElement is None:
         print("Creating variationsElement", False)
@@ -81,7 +83,8 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
                                  mInitTag: M,
                                  nInitTag: N}
                 variationElement = variationsElement.find(
-                    '.Variation[@M_init="{0:}"][@N_init="{1:}"][@Pd="{2:}"][@lambda_phi="{3:}"]'.format(M, N, P_d, lambda_phi))
+                    '.{0:}[@{1:}="{5:}"][@{2:}="{6:}"][@{3:}="{7:}"][@{4:}="{8:}"]'.format(
+                        variationTag, mInitTag, nInitTag, pdTag, lambdaphiTag, M, N, P_d, lambda_phi))
                 if variationElement is None:
                     variationElement = ET.SubElement(
                         variationsElement, variationTag,
@@ -128,7 +131,8 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
     if trackersettingsElement is None:
         storeTrackerData(variationElement, trackerArgs, trackerKwargs)
     for i in range(nSim):
-        runElement = variationElement.find('Run[@iteration="{:}"]'.format(i+1))
+        runElement = variationElement.find(
+        '{0:}[@{1:}="{2:}"]'.format(runTag, iterationTag,i+1))
         if runElement is not None:
             continue
         if kwargs.get('printLog', True):
