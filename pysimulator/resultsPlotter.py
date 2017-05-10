@@ -437,6 +437,7 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
             ax21.set_title("M={0:}, N={1:}".format(M_init, N_init), fontsize=18)
             ax21.legend(loc=2)
             ax21.grid(False)
+            ax21.set_ylim(-0.02, max(1,ax21.get_ylim()[1]))
             sns.despine(ax=ax21, offset=0)
 
             figure1.tight_layout()
