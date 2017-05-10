@@ -29,9 +29,7 @@ def exportAisState():
         writer = csv.writer(csvfile)
         nScenario = len(scenarioList)
         nTargets = len(scenarioList[0].initialTargets)
-        headerList = ["T"]
-        headerList.extend( ["S{:}".format(i) for i in range(nScenario)] )
-        print(headerList)
+        headerList = ["T"] + ["S{:}".format(i) for i in range(nScenario)]
         writer.writerow(headerList)
 
         for i in range(nTargets):
@@ -41,7 +39,7 @@ def exportAisState():
                     aisList.append(scenarioList[j].initialTargets[i].aisClass)
                 else:
                     aisList.append('-')
-            row = [str(i)].extend(aisList)
+            row = [str(i)] + aisList
             writer.writerow(row)
 
 def plotTrueTracks():
@@ -58,8 +56,8 @@ def plotTrueTracks():
     plt.ylabel("North [m]")
     plt.title("True tracks", fontsize=18)
     plt.grid(True)
-    plt.tight_layout()
     filePath = os.path.join(simulationConfig.path, 'plots', "ScenarioTruth.pdf")
+    plt.tight_layout()
     figure.savefig(filePath)
 
 def plotTrackLoss(loadFilePath):
@@ -68,12 +66,10 @@ def plotTrackLoss(loadFilePath):
     tree = ET.parse(loadFilePath)
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
-    scenarioSettingsElement = scenarioElement.find(scenariosettingsTag)
     variationsElement = scenarioElement.findall('.Variations[@preinitialized="True"]')[0]
     plotData = _getTrackLossPlotData(groundtruthElement, variationsElement)
     figure = _plotTrackLossPercentage(plotData)
     figure.savefig(savePath)
-
 
 def plotTrackingPercentage(loadFilePath):
     print("plotTrackingPercentage", loadFilePath)
@@ -81,15 +77,13 @@ def plotTrackingPercentage(loadFilePath):
     tree = ET.parse(loadFilePath)
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
-    scenarioSettingsElement = scenarioElement.find(scenariosettingsTag)
     variationsElement = scenarioElement.findall('.Variations[@preinitialized="True"]')[0]
     plotData = _getTrackingPercentagePlotData(groundtruthElement, variationsElement)
-    # print("plotData", plotData)
     figure = _plotTrackingPercentage(plotData)
     figure.savefig(savePath)
 
-
 def plotInitializationTime(loadFilePath):
+    if loadFilePath is None: return
     print("plotInitializationTime", loadFilePath)
     tree = ET.parse(loadFilePath)
     scenarioElement = tree.getroot()
@@ -103,14 +97,19 @@ def plotInitializationTime(loadFilePath):
     nTargets = len(groundtruthElement.findall(trackTag))
     _plotInitializationTime2D(variationsInitLog, loadFilePath, simLength, timeStep, nTargets)
 
-
-def plotTrackCorrectness(filePath):
-    pass
-
+def plotTrackCorrectness(loadFilePath):
+    print("plotTrackCorrectness", loadFilePath)
+    savePath = _getSavePath(loadFilePath, "TrackingCorrectness")
+    tree = ET.parse(loadFilePath)
+    scenarioElement = tree.getroot()
+    groundtruthElement = scenarioElement.find(groundtruthTag)
+    variationsElement = scenarioElement.findall('.Variations[@preinitialized="True"]')[0]
+    plotData = _getTrackingCorrectnessPlotData(variationsElement)
+    figure = _plotTrackingCorrectness(plotData)
+    figure.savefig(savePath)
 
 def plotRuntime(filePath):
     pass
-
 
 def _getTrackLossPlotData(groundtruthElement, variationsElement):
     trueIdList = [t.get(idTag)
@@ -140,7 +139,6 @@ def _getTrackLossPlotData(groundtruthElement, variationsElement):
         else:
             raise KeyError("Duplicate key found")
     return plotData
-
 
 def _getTrackingPercentagePlotData(groundtruthElement, variationsElement):
     trueIdList = [t.get(idTag)
@@ -174,7 +172,6 @@ def _getTrackingPercentagePlotData(groundtruthElement, variationsElement):
             raise KeyError("Duplicate key found")
     return plotData
 
-
 def _getInitializationTimePlotData(variationsElement):
     variationsInitLog = {}
     variationElementList = variationsElement.findall(variationTag)
@@ -199,14 +196,17 @@ def _getInitializationTimePlotData(variationsElement):
             falseTargetsList = ast.literal_eval(falseTargetsElement.text)
             for time, change in falseTargetsList:
                 if time not in falseInitTimeLog:
-                    falseInitTimeLog[time] = 0
-                falseInitTimeLog[time] += change[0]
+                    falseInitTimeLog[time] = [0,0]
+                falseInitTimeLog[time][0] += change[0]
+                falseInitTimeLog[time][1] += (change[0] + change[1])
+
 
         for k,v in correctInitTimeLog.items():
             correctInitTimeLog[k] = float(v) / float(len(runElementList))
 
         for k,v in falseInitTimeLog.items():
-            falseInitTimeLog[k] = float(v) / float(len(runElementList))
+            falseInitTimeLog[k][0] = float(v[0]) / float(len(runElementList))
+            falseInitTimeLog[k][1] = float(v[1]) / float(len(runElementList))
 
         #TODO: http://stackoverflow.com/questions/14692690/access-nested-dictionary-items-via-a-list-of-keys
         if M_init not in variationsInitLog:
@@ -222,6 +222,22 @@ def _getInitializationTimePlotData(variationsElement):
 
     return variationsInitLog
 
+def _getTrackingCorrectnessPlotData(variationsElement):
+    plotData = {}
+    variationList = variationsElement.findall(variationTag)
+    for variationElement in variationList:
+        N = float(variationElement.get(nTag))
+        P_d = float(variationElement.get(pdTag))
+        lambda_phi = float(variationElement.get(lambdaphiTag))
+        originalRmsList = []
+        smoothRmsList = []
+        runList = variationElement.findall(runTag)
+        for runElement in runList:
+            trackList = runElement.findall(trackTag)
+            for trackElement in trackList:
+                pass
+
+    return plotData
 
 def _plotTrackLossPercentage(plotData):
     figure = plt.figure(figsize=(10, 10), dpi=100)
@@ -245,7 +261,7 @@ def _plotTrackLossPercentage(plotData):
             y = np.ones(len(x))*P_d*100
             z = np.array(z)
             ax.plot(x,y,z,
-                    label = "N="+str(N) if j == 0 else None,
+                    label = "N="+"{:.0f}".format(N) if j == 0 else None,
                     c = colors[i],
                     linewidth = 4)
     lambdaPhiList = list(lambdaPhiSet)
@@ -258,7 +274,7 @@ def _plotTrackLossPercentage(plotData):
     ax.set_ylabel("\nProbability of detection (%)", fontsize=18, linespacing=2)
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
     ax.set_zlim(0, maxTrackloss)
-    ax.tick_params(labelsize=16, pad=1)
+    ax.tick_params(labelsize=16, pad=8)
     yStart, yEnd = ax.get_ylim()
     ax.yaxis.set_ticks(np.arange(yStart, yEnd * 1.01, 10))
     ax.xaxis.set_ticks(lambdaPhiList)
@@ -267,9 +283,8 @@ def _plotTrackLossPercentage(plotData):
         label.set_verticalalignment('bottom')
         label.set_horizontalalignment('left')
         label.set_rotation(0)
-
+    figure.tight_layout()
     return figure
-
 
 def _plotTrackingPercentage(plotData):
     figure = plt.figure(figsize=(10, 10), dpi=100)
@@ -293,20 +308,21 @@ def _plotTrackingPercentage(plotData):
             y = np.ones(len(x)) * P_d * 100
             z = np.array(z)
             ax.plot(x, y, z,
-                    label="N=" + str(N) if j == 0 else None,
+                    label="N=" + "{:.0f}".format(N) if j == 0 else None,
                     c=colors[i],
                     linewidth=4)
     lambdaPhiList = list(lambdaPhiSet)
     lambdaPhiList.sort()
 
     ax.view_init(15, -165)
-    ax.legend(loc='upper right', bbox_to_anchor=(0.5, 0.8), fontsize=18)
+    ax.legend(bbox_to_anchor=(0.4, 0.5), fontsize=18)
     ax.set_xlabel("$\lambda_{\phi}$", fontsize=18, labelpad=30)
     ax.set_zlabel("\nTracking (%)", fontsize=18, linespacing=3)
     ax.set_ylabel("\nProbability of detection (%)", fontsize=18, linespacing=2)
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
     ax.set_zlim(96, 100)
-    ax.tick_params(labelsize=16, pad=1)
+    ax.tick_params(labelsize=16, pad=8)
+
     yStart, yEnd = ax.get_ylim()
     ax.yaxis.set_ticks(np.arange(yStart, yEnd * 1.01, 10))
     ax.xaxis.set_ticks(lambdaPhiList)
@@ -315,76 +331,52 @@ def _plotTrackingPercentage(plotData):
         label.set_verticalalignment('bottom')
         label.set_horizontalalignment('left')
         label.set_rotation(0)
-
+    figure.tight_layout()
     return figure
-
-
-def _plotInitializationTime3D(plotData, loadFilePath, simLength, timeStep, nTargets):
-    for M_init, d1 in plotData.items():
-        for N_init, d2 in d1.items():
-            figure = plt.figure(figsize=(10, 10), dpi=100)
-            lambdaPhiSet = set()
-            colors = sns.color_palette(n_colors=5)
-            sns.set_style(style='white')
-            ax = figure.add_subplot(111, projection='3d')
-            savePath = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
-            for k, (lambda_phi, d3) in enumerate(d2.items()):
-                lambdaPhiSet.add(float(lambda_phi))
-                for j, (P_d, initTimeLog) in enumerate(d3.items()):
-                    timeArray = np.arange(0, simLength, timeStep)
-                    pmf = np.zeros_like(timeArray)
-                    for i, time in enumerate(timeArray):
-                        if str(time) in initTimeLog:
-                            pmf[i] = initTimeLog[str(time)]
-                    cpmf = np.cumsum(pmf) / float(nTargets)
-                    lambdaphiArray = np.ones_like(timeArray) *float(lambda_phi)
-                    ax.plot(timeArray, lambdaphiArray, cpmf,
-                            label="P_d = {:}".format(P_d) if k==0 else None,
-                            c=colors[j])
-            ax.view_init(15, -150)
-            ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
-            ax.set_zlim(0, 1)
-            ax.yaxis.set_ticks(list(lambdaPhiSet))
-            ax.set_xlabel("\nTime steps", fontsize=18, linespacing=2)
-            ax.set_ylabel("$\lambda_{\phi}$", fontsize=18, labelpad=30)
-            ax.set_zlabel("\ncpfm", fontsize=18, linespacing=3)
-            plt.title("M={0:}, N={1:}".format(M_init, N_init), fontsize=18)
-            plt.legend(loc=4)
-            plt.savefig(savePath)
-            plt.close()
 
 def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTargets):
     timeArray = np.arange(0, simLength, timeStep)
     for M_init, d1 in plotData.items():
         for N_init, d2 in d1.items():
             figure1 = plt.figure(figsize=(10, 14), dpi=100)
-            ax1 = figure1.add_subplot(211)
-            ax2 = figure1.add_subplot(212)
-            figure2 = plt.figure(figsize=(10,10), dpi=100)
+            figure2 = plt.figure(figsize=(10, 6), dpi=100)
+
+            ax11 = figure1.add_subplot(211)
+            ax12 = figure1.add_subplot(212)
+            ax21 = figure2.add_subplot(111)
             colors = sns.color_palette(n_colors=5)
             linestyleList = ['-','--','-.']
             sns.set_style(style='white')
-            savePath = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
+            savePath1 = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
+            savePath2 = _getSavePath(loadFilePath, "Time({0:}-{1:})_persistent".format(M_init, N_init))
             cpfmList = []
             falseCPFMlist = []
+            accFalseTrackList = []
             for k, (lambda_phi, d3) in enumerate(d2.items()):
                 for j, (P_d, (correctInitTimeLog, falseInitTimeLog)) in enumerate(d3.items()):
                     falsePFM = np.zeros_like(timeArray)
                     pmf = np.zeros_like(timeArray)
+                    falseTrackDelta = np.zeros_like(timeArray)
                     for i, time in enumerate(timeArray):
                         if str(time) in correctInitTimeLog:
                             pmf[i] = correctInitTimeLog[str(time)]
                         if str(time) in falseInitTimeLog:
-                            falsePFM[i] = falseInitTimeLog[str(time)]
+                            falsePFM[i] = falseInitTimeLog[str(time)][0]
+                            falseTrackDelta[i] = falseInitTimeLog[str(time)][1]
                     cpmf = np.cumsum(pmf) / float(nTargets)
                     falseCPFM = np.cumsum(falsePFM)
+                    falseTrackDelta = np.cumsum(falseTrackDelta)
                     cpfmList.append((P_d, lambda_phi, cpmf))
                     falseCPFMlist.append((P_d, lambda_phi, falseCPFM))
+                    accFalseTrackList.append((P_d, lambda_phi, falseTrackDelta))
             cpfmList.sort(key=lambda tup: float(tup[1]))
             cpfmList.sort(key=lambda tup: float(tup[0]), reverse=True)
 
             falseCPFMlist.sort(key=lambda tup: float(tup[1]))
             falseCPFMlist.sort(key=lambda tup: float(tup[0]), reverse=True)
+
+            accFalseTrackList.sort(key=lambda tup: float(tup[1]))
+            accFalseTrackList.sort(key=lambda tup: float(tup[0]), reverse=True)
 
             pdSet = set()
             lambdaPhiSet = set()
@@ -393,7 +385,7 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                     lambdaPhiSet.clear()
                 pdSet.add(P_d)
                 lambdaPhiSet.add(lambda_phi)
-                ax1.plot(timeArray,
+                ax11.plot(timeArray,
                         cpmf,
                         label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                         c=colors[len(pdSet)-1],
@@ -406,22 +398,59 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                     lambdaPhiSet.clear()
                 pdSet.add(P_d)
                 lambdaPhiSet.add(lambda_phi)
-                ax2.plot(timeArray,
+                ax12.plot(timeArray,
                         cpmf,
                         label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                         c=colors[len(pdSet)-1],
                         linestyle=linestyleList[len(lambdaPhiSet)-1])
 
-            ax2.set_ylim(0,60)
-            ax1.set_xlabel("Time steps", fontsize=18, linespacing=2)
-            ax1.set_ylabel("cpfm", fontsize=18, linespacing=3)
-            ax1.set_title("M={0:}, N={1:}".format(M_init, N_init), fontsize=18)
-            plt.grid(False)
-            ax1.legend(loc=4)
-            ax2.legend(loc=2)
-            sns.despine(ax=ax1, offset=0)
-            plt.savefig(savePath)
+            pdSet = set()
+            lambdaPhiSet = set()
+            for P_d, lambda_phi, accFalseTrack in accFalseTrackList:
+                if P_d not in pdSet:
+                    lambdaPhiSet.clear()
+                pdSet.add(P_d)
+                lambdaPhiSet.add(lambda_phi)
+                ax21.plot(timeArray,
+                          accFalseTrack,
+                         label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
+                         c=colors[len(pdSet) - 1],
+                         linestyle=linestyleList[len(lambdaPhiSet) - 1])
+
+            ax11.set_xlabel("Time [s]", fontsize=18, linespacing=2)
+            ax11.set_ylabel("cpfm", fontsize=18, linespacing=3)
+            ax11.set_title("M={0:}, N={1:}".format(M_init, N_init), fontsize=18)
+            ax11.legend(loc=4)
+            ax11.grid(False)
+            sns.despine(ax=ax11, offset=0)
+
+            ax12.set_xlabel("Time [s]", fontsize=18, linespacing=2)
+            ax12.set_ylabel("Number of tracks", fontsize=18, linespacing=2)
+            ax12.set_title("Accumulative number of erroneous tracks", fontsize=18)
+            ax12.set_ylim(0,60)
+            ax12.legend(loc=2)
+            ax12.grid(False)
+            sns.despine(ax=ax12, offset=0)
+
+            ax21.set_xlabel("Time [s]", fontsize=18, linespacing=2)
+            ax21.set_ylabel("Number of tracks", fontsize=18, linespacing=2)
+            ax21.set_title("M={0:}, N={1:}".format(M_init, N_init), fontsize=18)
+            ax21.legend(loc=2)
+            ax21.grid(False)
+            sns.despine(ax=ax21, offset=0)
+
+            figure1.tight_layout()
+            figure1.savefig(savePath1)
+            figure1.clf()
+
+            figure2.tight_layout()
+            figure2.savefig(savePath2)
+            figure2.clf()
+
             plt.close()
+
+def _plotTrackingCorrectness(plotData):
+    return plt.figure()
 
 def _getSavePath(loadFilePath, nameAdd):
     head, tail = os.path.split(loadFilePath)
