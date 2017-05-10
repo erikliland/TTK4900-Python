@@ -142,11 +142,12 @@ def _matchAndTimeInitialTracks(groundtruthList, runElement, threshold):
         firstStateList.append((stateTime, estimatedTrackID, firstStateElement))
     firstStateList.sort(key=lambda tup: float(tup[0]))
 
-    print("start false id set", falseTrackIdSet)
+    # print("start false id set", falseTrackIdSet)
 
     initiationLog = []
     initiatedTrueTracksID = set()
     for (time, trackTupleList) in trueTrackList:
+        # print()
         newTracks = [s for s in firstStateList
                      if s[0] == time]
         uninitiatedTracks = [s for s in trackTupleList
@@ -155,8 +156,8 @@ def _matchAndTimeInitialTracks(groundtruthList, runElement, threshold):
         nUninitializedTracks = len(uninitiatedTracks)
         if nNewTracks == 0:# or nUninitializedTracks == 0:
             continue
-        print("un-init ID",  [s[0] for s in trackTupleList
-                              if s[0] not in initiatedTrueTracksID])
+        # print("un-init ID",  [s[0] for s in trackTupleList
+        #                       if s[0] not in initiatedTrueTracksID])
         deltaMatrix = np.zeros((nNewTracks, nUninitializedTracks))
         for i, initiator in enumerate(newTracks):
             for j, (id, stateElement) in enumerate(uninitiatedTracks):
@@ -164,41 +165,45 @@ def _matchAndTimeInitialTracks(groundtruthList, runElement, threshold):
                                           _parsePosition(stateElement.find(positionTag)))
                 deltaMatrix[i,j] = distance
         deltaMatrix[deltaMatrix>threshold] = np.inf
-        print("time",time,"deltaMatrix\n",deltaMatrix)
-        print("Test",np.all(deltaMatrix==np.inf, axis=1))
+        # print("time",time,"deltaMatrix\n",deltaMatrix)
+        # print("Test",np.all(deltaMatrix==np.inf, axis=1))
 
         associations = _solve_global_nearest_neighbour(deltaMatrix)
         for initIndex, trackIndex in associations:
             initiatedTrueTracksID.add(uninitiatedTracks[trackIndex][0])
-            print("Removing id from false", newTracks[initIndex][1])
+            # print("Removing id from false", newTracks[initIndex][1])
             falseTrackIdSet.remove(str(newTracks[initIndex][1]))
             initiationLog.append((time, uninitiatedTracks[trackIndex][0]))
 
 
         if np.any(np.all(deltaMatrix==np.inf, axis=1)): #Columns with only inf
             unresolvedNewTracks = [s for s in newTracks if s[1] in falseTrackIdSet]
-            print("unresolvedNewTracks",unresolvedNewTracks)
-            initiatedTracksList = [s for s in firstStateList if s[0] in initiatedTrueTracksID]
-            print("Only inf")
+            # print("unresolvedNewTracks",unresolvedNewTracks)
+            initiatedTracksList = [s for s in trackTupleList if s[0] in initiatedTrueTracksID]
+            # print("Only inf")
             nInitiatedTracks = len(initiatedTrueTracksID)
-            if nNewTracks == 0 or nInitiatedTracks == 0:
+            if nInitiatedTracks == 0:
                 continue
-            deltaMatrix2 = np.zeros((nNewTracks, nInitiatedTracks))
+            nUnresolvedTracks = len(unresolvedNewTracks)
+            deltaMatrix2 = np.zeros((nUnresolvedTracks, nInitiatedTracks))
             for i, initiator in enumerate(unresolvedNewTracks):
                 for j, (id, stateElement) in enumerate(initiatedTracksList):
                     distance = np.linalg.norm(_parsePosition(initiator[2].find(positionTag)) -
                                               _parsePosition(stateElement.find(positionTag)))
                     deltaMatrix2[i,j] = distance
-                deltaMatrix2[deltaMatrix2>threshold] = np.inf
-                #Crude test. Could be done as above...
-                if np.any(deltaMatrix2 != np.inf):
-                    print("Removing from false set:",newTracks[i][1])
+            # print("deltaMatrix2\n",deltaMatrix2)
+            deltaMatrix2[deltaMatrix2>threshold] = np.inf
+            # print("deltaMatrix2\n",deltaMatrix2)
+            #Crude test. Could be done as above...
+            for i in range(nUnresolvedTracks):
+                if np.any(deltaMatrix2[i] != np.inf):
+                    # print("Removing from false set:",newTracks[i][1])
                     falseTrackIdSet.remove(str(unresolvedNewTracks[i][1]))
             continue
 
     initiationLog.sort(key=lambda tup: float(tup[1]))
 
-    print("falseTrackIdSet",falseTrackIdSet)
+    # print("falseTrackIdSet",falseTrackIdSet)
 
     falseInitiationLog = _getFalseInitiationLog(runElement, falseTrackIdSet)
 
