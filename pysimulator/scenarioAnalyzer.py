@@ -50,12 +50,10 @@ def analyzeVariationsTrackingPerformance(groundtruthList, variationsElement, thr
     for variation in variationList:
         analyzeVariationTrackLossPerformance(groundtruthList, variation, threshold)
 
-
 def analyzeVariationsInitializationPerformance(groundtruthList, variationsElement, threshold):
     variationList = variationsElement.findall(variationTag)
     for variation in variationList:
         analyzeVariationInitializationPerformance(groundtruthList, variation, threshold)
-
 
 def analyzeVariationTrackLossPerformance(groundtruthList, variation, threshold):
     runList = variation.findall(runTag)
@@ -63,7 +61,6 @@ def analyzeVariationTrackLossPerformance(groundtruthList, variation, threshold):
         estimateTrackList = run.findall(trackTag)
         matchList = _matchTrueWithEstimatedTracks(groundtruthList, estimateTrackList, threshold)
         _storeMatchList(run, matchList)
-
 
 def analyzeVariationInitializationPerformance(groundtruthList, variation, threshold):
     runList = variation.findall(runTag)
@@ -73,13 +70,14 @@ def analyzeVariationInitializationPerformance(groundtruthList, variation, thresh
         initiationLog, falseInitiationLog = _matchAndTimeInitialTracks(groundtruthList, runElement, threshold)
         _storeInitializationLog(runElement, initiationLog, falseInitiationLog)
 
-
 def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
     resultList = []
     for trueTrack in truetrackList:
         trueTrackStatesElement = trueTrack.find(statesTag)
         trueTrackStateList = trueTrackStatesElement.findall(stateTag)
         trueTrackID = trueTrack.get(idTag)
+        trackLength = len(trueTrackStateList)
+        # trueTrack.set(lengthTag, str(trackLength))
         for estimatedTrack in estimateTrackList:
             estimatedTrackID = estimatedTrack.get(idTag)
             estimatedTrackStatesElement = estimatedTrack.find(statesTag)
@@ -95,8 +93,8 @@ def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
             timeMatchLength = len(timeMatch)
             goodTimeMatchLength = len(goodTimeMatch)
 
-            if timeMatchLength > 0:
-                trackPercent = (goodTimeMatchLength / len(timeMatch))*100
+            if goodTimeMatchLength > 0:
+                trackPercent = (goodTimeMatchLength / trackLength)*100
 
                 resultList.append((trueTrackID,
                                    estimatedTrackID,
@@ -112,7 +110,6 @@ def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
     _multiplePossibleMatches(resultList)
 
     return resultList
-
 
 def _matchAndTimeInitialTracks(groundtruthList, runElement, threshold):
     estimateTrackList = runElement.findall(trackTag)
@@ -209,7 +206,6 @@ def _matchAndTimeInitialTracks(groundtruthList, runElement, threshold):
 
     return initiationLog, falseInitiationLog
 
-
 def _compareTrackList(trueTrackStateList, estimatedStateList, threshold):
     timeMatch = _timeMatch(trueTrackStateList, estimatedStateList)
 
@@ -230,7 +226,6 @@ def _compareTrackList(trueTrackStateList, estimatedStateList, threshold):
         return (timeMatch, goodTimeMatch, rmsError, lostTrack)
 
     return ([],[],np.nan, None)
-
 
 def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshold):
     assert len(trueTrackSlice) == len(estimatedTrackSlice)
@@ -264,7 +259,6 @@ def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshol
 
     return ([], np.nan, None)
 
-
 def _storeMatchList(run, matchList):
     for match in matchList:
         (trueTrackID,
@@ -293,7 +287,6 @@ def _storeMatchList(run, matchList):
         statesElement.set(rmserrorTag, "{:.4f}".format(rmsError))
         smoothedStatesElement.set(rmserrorTag, "{:.4f}".format(smoothedRmsError))
 
-
 def _storeInitializationLog(runElement, initiationLog, falseInitiationLog):
     initiationLogElement = ET.SubElement(runElement, initializationLogTag)
 
@@ -311,7 +304,6 @@ def _timeMatch(trueTrackStateList, estimatedStateList):
     estimatedTrackTimeList = [e.get(timeTag) for e in estimatedStateList]
     commonTimes = [tT for tT in trueTrackTimeList if tT in estimatedTrackTimeList]
     return commonTimes
-
 
 def _getFalseInitiationLog(runElement, falseTrackIdSet):
     falseInitiationLog = {}
@@ -339,7 +331,6 @@ def _parsePosition(positionElement):
     east = positionElement.find(eastTag).text
     position = np.array([east, north], dtype=np.double)
     return position
-
 
 def _multiplePossibleMatches(resultList):
     import collections
