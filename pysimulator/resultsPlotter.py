@@ -308,7 +308,6 @@ def _plotTrackLossPercentage(plotData):
 def _plotTrackingPercentage(plotData):
     figure = plt.figure(figsize=(10, 10), dpi=100)
     sns.set_style(style='white')
-    # ax = figure.add_subplot(111, projection='3d')
     ax = figure.gca()
 
     minTracking = 100.
@@ -349,23 +348,14 @@ def _plotTrackingPercentage(plotData):
     lambdaPhiList = list(lambdaPhiSet)
     lambdaPhiList.sort()
 
-    # ax.view_init(15, -165)
     ax.legend(loc=0, ncol=len(pdSet), fontsize=18)
     ax.set_xlabel("$\lambda_{\phi}$", fontsize=18)
     ax.set_ylabel("\nAverage tracking percentage", fontsize=18)
-    # ax.set_ylabel("\nProbability of detection (%)", fontsize=18, linespacing=2)
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
     ax.set_ylim(ax.get_ylim()[0], 100.01)
     ax.tick_params(labelsize=16, pad=8)
     sns.despine(ax=ax, offset=0)
-    yStart, yEnd = ax.get_ylim()
-    # ax.yaxis.set_ticks(np.arange(yStart, yEnd * 1.01, 10))
     ax.xaxis.set_ticks(lambdaPhiList)
-    # xTickLabels = ax.xaxis.get_ticklabels()
-    # for label in xTickLabels:
-    #     label.set_verticalalignment('bottom')
-    #     label.set_horizontalalignment('left')
-    #     label.set_rotation(0)
     figure.tight_layout()
     return figure
 
