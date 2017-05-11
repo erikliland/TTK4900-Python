@@ -11,6 +11,8 @@ import ast
 import simulationConfig
 from pysimulator.scenarios.scenarios import scenarioList
 
+colors = sns.color_palette(n_colors=5)
+linestyleList = ['-','--','-.', ':']
 
 def exportInitialState():
     filePath = os.path.join(simulationConfig.path, 'plots', "Scenario_Initial_State.csv")
@@ -59,8 +61,10 @@ def plotTrueTracks():
     filePath = os.path.join(simulationConfig.path, 'plots', "ScenarioTruth.pdf")
     plt.tight_layout()
     figure.savefig(filePath)
+    plt.close()
 
 def plotTrackLoss(loadFilePath):
+    if loadFilePath is None: return
     print("plotTrackLoss", loadFilePath)
     savePath = _getSavePath(loadFilePath, "TrackLoss")
     tree = ET.parse(loadFilePath)
@@ -70,8 +74,11 @@ def plotTrackLoss(loadFilePath):
     plotData = _getTrackLossPlotData(groundtruthElement, variationsElement)
     figure = _plotTrackLossPercentage(plotData)
     figure.savefig(savePath)
+    plt.close()
 
 def plotTrackingPercentage(loadFilePath):
+    if loadFilePath is None: return
+
     print("plotTrackingPercentage", loadFilePath)
     savePath = _getSavePath(loadFilePath, "TrackingPercentage")
     tree = ET.parse(loadFilePath)
@@ -81,6 +88,7 @@ def plotTrackingPercentage(loadFilePath):
     plotData = _getTrackingPercentagePlotData(groundtruthElement, variationsElement)
     figure = _plotTrackingPercentage(plotData)
     figure.savefig(savePath)
+    plt.close()
 
 def plotInitializationTime(loadFilePath):
     if loadFilePath is None: return
@@ -96,8 +104,10 @@ def plotInitializationTime(loadFilePath):
     timeStep = float(scenarioSettingsElement.find("radarPeriod").text)
     nTargets = len(groundtruthElement.findall(trackTag))
     _plotInitializationTime2D(variationsInitLog, loadFilePath, simLength, timeStep, nTargets)
+    plt.close()
 
 def plotTrackCorrectness(loadFilePath):
+    if loadFilePath is None: return
     print("plotTrackCorrectness", loadFilePath)
     savePath = _getSavePath(loadFilePath, "TrackingCorrectness")
     tree = ET.parse(loadFilePath)
@@ -107,8 +117,11 @@ def plotTrackCorrectness(loadFilePath):
     plotData = _getTrackingCorrectnessPlotData(variationsElement)
     figure = _plotTrackingCorrectness(plotData)
     figure.savefig(savePath)
+    plt.close()
 
-def plotRuntime(filePath):
+def plotRuntime(loadFilePath):
+    if loadFilePath is None: return
+    plt.close()
     pass
 
 def _getTrackLossPlotData(groundtruthElement, variationsElement):
@@ -149,25 +162,25 @@ def _getTrackingPercentagePlotData(groundtruthElement, variationsElement):
         N = float(variation.get(nTag))
         P_d = float(variation.get(pdTag))
         lambda_phi = float(variation.get(lambdaphiTag))
-        trackingLength = np.zeros(2, dtype=np.int)
-        for run in variation.findall(runTag):
-            trackList = run.findall(trackTag)
-            trackingLengthArray = np.array([[t.get(goodtimematchlengthTag),
-                                             t.get(timematchlengthTag)]
-                                            for t in trackList
-                                            if t.get(matchidTag) in trueIdList],
-                                           ndmin=2, dtype=np.int)
-            trackingLengthArray = np.sum(trackingLengthArray, axis=0)
-            trackingLength +=  trackingLengthArray
+        trackingPercentList = []
+        for runElement in variation.findall(runTag):
+            trackingPercentArray = np.zeros_like(trueIdList, dtype=np.float32)
+            for i, id in enumerate(trueIdList):
+                matchTrackList = runElement.findall('.{0:}[@{1:}="{2:}"]'.format(trackTag, matchidTag, id))
+                for track in matchTrackList:
+                    trackingPercentArray[i] += float(track.get(trackpercentTag,0))
+            trackingPercentList.append(trackingPercentArray)
 
-        trackingPercentage = (float(trackingLength[0]) / float(trackingLength[1])) * 100
+        trackingPercentList = np.array(trackingPercentList, ndmin=2, dtype=np.float32)
+        runMeanArray = np.mean(trackingPercentList, axis=0)
+        trackingPercentageMean = np.mean(runMeanArray)
 
         if P_d not in plotData:
             plotData[P_d] = {}
         if N not in plotData[P_d]:
             plotData[P_d][N] = {}
         if lambda_phi not in plotData[P_d][N]:
-            plotData[P_d][N][lambda_phi] = trackingPercentage
+            plotData[P_d][N][lambda_phi] = trackingPercentageMean
         else:
             raise KeyError("Duplicate key found")
     return plotData
@@ -243,94 +256,116 @@ def _plotTrackLossPercentage(plotData):
     figure = plt.figure(figsize=(10, 10), dpi=100)
     colors = sns.color_palette(n_colors=5)
     sns.set_style(style='white')
-    ax = figure.add_subplot(111, projection='3d')
-
+    ax = figure.gca()
     maxTrackloss = 0.
     lambdaPhiSet = set()
 
+    trackLossList = []
     for j, (P_d, d1) in enumerate(plotData.items()):
         for i, (N, d2) in enumerate(d1.items()):
             x = []
-            z = []
+            y = []
             for lambda_phi, trackLossPercentage in d2.items():
                 x.append(lambda_phi)
-                z.append(trackLossPercentage)
+                y.append(trackLossPercentage)
                 maxTrackloss = max(maxTrackloss, trackLossPercentage)
                 lambdaPhiSet.add(lambda_phi)
+            x, y = (list(t) for t in zip(*sorted(zip(x, y))))
             x = np.array(x)
-            y = np.ones(len(x))*P_d*100
-            z = np.array(z)
-            ax.plot(x,y,z,
-                    label = "N="+"{:.0f}".format(N) if j == 0 else None,
-                    c = colors[i],
-                    linewidth = 4)
+            y = np.array(y)
+            trackLossList.append((P_d, N, x, y))
+
+    trackLossList.sort(key=lambda tup: float(tup[1]))
+    trackLossList.sort(key=lambda tup: float(tup[0]))
+
+    pdSet = set()
+    nSet = set()
+    for P_d, N, x, y in trackLossList:
+        if P_d not in pdSet:
+            nSet.clear()
+        pdSet.add(P_d)
+        nSet.add(N)
+        ax.plot(x,y,
+                label = "$P_D$={0:}, N={1:.0f}".format(P_d, N),
+                c = colors[len(nSet)-1],
+                linestyle=linestyleList[len(pdSet)-1],
+                linewidth = 2)
     lambdaPhiList = list(lambdaPhiSet)
     lambdaPhiList.sort()
 
-    ax.view_init(15, -165)
-    ax.legend(loc='upper right', bbox_to_anchor=(0.5, 0.8), fontsize=18)
-    ax.set_xlabel("$\lambda_{\phi}$", fontsize=18, labelpad=30)
-    ax.set_zlabel("\nTrack loss (%)", fontsize=18, linespacing=3)
-    ax.set_ylabel("\nProbability of detection (%)", fontsize=18, linespacing=2)
+    ax.legend(loc=0, ncol=len(pdSet), fontsize=18)
+    ax.set_xlabel("$\lambda_{\phi}$", fontsize=18)
+    ax.set_ylabel("Track loss (%)", fontsize=18)
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
-    ax.set_zlim(0, maxTrackloss)
+    ax.set_ylim(0, 30)
     ax.tick_params(labelsize=16, pad=8)
     yStart, yEnd = ax.get_ylim()
     ax.yaxis.set_ticks(np.arange(yStart, yEnd * 1.01, 10))
     ax.xaxis.set_ticks(lambdaPhiList)
-    xTickLabels = ax.xaxis.get_ticklabels()
-    for label in xTickLabels:
-        label.set_verticalalignment('bottom')
-        label.set_horizontalalignment('left')
-        label.set_rotation(0)
     figure.tight_layout()
     return figure
 
 def _plotTrackingPercentage(plotData):
     figure = plt.figure(figsize=(10, 10), dpi=100)
-    colors = sns.color_palette(n_colors=5)
     sns.set_style(style='white')
-    ax = figure.add_subplot(111, projection='3d')
+    # ax = figure.add_subplot(111, projection='3d')
+    ax = figure.gca()
 
     minTracking = 100.
     lambdaPhiSet = set()
 
+    trackingPercentageList = []
     for j, (P_d, d1) in enumerate(plotData.items()):
         for i, (N, d2) in enumerate(d1.items()):
             x = []
-            z = []
+            y = []
             for lambda_phi, trackingPercentage in d2.items():
                 x.append(lambda_phi)
-                z.append(trackingPercentage)
+                y.append(trackingPercentage)
                 minTracking = min(minTracking, trackingPercentage)
                 lambdaPhiSet.add(lambda_phi)
             x = np.array(x)
-            y = np.ones(len(x)) * P_d * 100
-            z = np.array(z)
-            ax.plot(x, y, z,
-                    label="N=" + "{:.0f}".format(N) if j == 0 else None,
-                    c=colors[i],
-                    linewidth=4)
+            y = np.array(y)
+            x, y = (list(t) for t in zip(*sorted(zip(x, y))))
+
+            trackingPercentageList.append((P_d, N, x, y))
+
+    trackingPercentageList.sort(key=lambda tup: float(tup[1]), reverse=True)
+    trackingPercentageList.sort(key=lambda tup: float(tup[0]), reverse=True)
+
+    pdSet = set()
+    nSet = set()
+    for P_d, N, x, y in trackingPercentageList:
+        if P_d not in pdSet:
+            nSet.clear()
+        pdSet.add(P_d)
+        nSet.add(N)
+        ax.plot(x, y,
+                label="$P_D$={0:}, N={1:.0f}".format(P_d, N),
+                c=colors[len(nSet) - 1],
+                linestyle=linestyleList[len(pdSet) - 1],
+                linewidth=2)
+
     lambdaPhiList = list(lambdaPhiSet)
     lambdaPhiList.sort()
 
-    ax.view_init(15, -165)
-    ax.legend(bbox_to_anchor=(0.4, 0.5), fontsize=18)
-    ax.set_xlabel("$\lambda_{\phi}$", fontsize=18, labelpad=30)
-    ax.set_zlabel("\nTracking (%)", fontsize=18, linespacing=3)
-    ax.set_ylabel("\nProbability of detection (%)", fontsize=18, linespacing=2)
+    # ax.view_init(15, -165)
+    ax.legend(loc=0, ncol=len(pdSet), fontsize=18)
+    ax.set_xlabel("$\lambda_{\phi}$", fontsize=18)
+    ax.set_ylabel("\nAverage tracking percentage", fontsize=18)
+    # ax.set_ylabel("\nProbability of detection (%)", fontsize=18, linespacing=2)
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
-    ax.set_zlim(96, 100)
+    ax.set_ylim(ax.get_ylim()[0], 100.01)
     ax.tick_params(labelsize=16, pad=8)
-
+    sns.despine(ax=ax, offset=0)
     yStart, yEnd = ax.get_ylim()
-    ax.yaxis.set_ticks(np.arange(yStart, yEnd * 1.01, 10))
+    # ax.yaxis.set_ticks(np.arange(yStart, yEnd * 1.01, 10))
     ax.xaxis.set_ticks(lambdaPhiList)
-    xTickLabels = ax.xaxis.get_ticklabels()
-    for label in xTickLabels:
-        label.set_verticalalignment('bottom')
-        label.set_horizontalalignment('left')
-        label.set_rotation(0)
+    # xTickLabels = ax.xaxis.get_ticklabels()
+    # for label in xTickLabels:
+    #     label.set_verticalalignment('bottom')
+    #     label.set_horizontalalignment('left')
+    #     label.set_rotation(0)
     figure.tight_layout()
     return figure
 
@@ -344,11 +379,10 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
             ax11 = figure1.add_subplot(311)
             ax12 = figure1.add_subplot(312)
             ax13 = figure1.add_subplot(313)
-            colors = sns.color_palette(n_colors=5)
-            linestyleList = ['-','--','-.']
+
             sns.set_style(style='white')
             savePath1 = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
-            savePath2 = _getSavePath(loadFilePath, "Time({0:}-{1:})_persistent".format(M_init, N_init))
+            # savePath2 = _getSavePath(loadFilePath, "Time({0:}-{1:})_persistent".format(M_init, N_init))
             cpfmList = []
             falseCPFMlist = []
             accFalseTrackList = []
@@ -387,7 +421,7 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                 lambdaPhiSet.add(lambda_phi)
                 ax11.plot(timeArray,
                         cpmf,
-                        label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
+                        label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                         c=colors[len(pdSet)-1],
                         linestyle=linestyleList[len(lambdaPhiSet)-1])
 
@@ -400,7 +434,7 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                 lambdaPhiSet.add(lambda_phi)
                 ax12.semilogy(timeArray,
                         cpmf+(1e-10),
-                        label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
+                        label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                         c=colors[len(pdSet)-1],
                         linestyle=linestyleList[len(lambdaPhiSet)-1])
 
@@ -413,14 +447,14 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                 lambdaPhiSet.add(lambda_phi)
                 ax13.plot(timeArray,
                           accFalseTrack,
-                         label="P_d = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
+                         label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                          c=colors[len(pdSet) - 1],
                          linestyle=linestyleList[len(lambdaPhiSet) - 1])
 
             ax11.set_xlabel("Time [s]", fontsize=14)
             ax11.set_ylabel("Average cpfm", fontsize=14, linespacing=3)
             ax11.set_title("Cumulative Probability Mass Function", fontsize=18)
-            ax11.legend(loc=4)
+            ax11.legend(loc=4, ncol=len(pdSet))
             ax11.grid(False)
             ax11.set_ylim(0,1)
             sns.despine(ax=ax11, offset=0)
@@ -428,7 +462,7 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
             ax12.set_xlabel("Time [s]", fontsize=14)
             ax12.set_ylabel("Average number of tracks", fontsize=14, linespacing=2)
             ax12.set_title("Accumulative number of erroneous tracks", fontsize=18)
-            ax12.set_ylim(1e-2,60)
+            ax12.set_ylim(1e-2,100)
             ax12.grid(False)
             sns.despine(ax=ax12, offset=0)
 
