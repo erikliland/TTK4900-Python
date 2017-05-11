@@ -134,6 +134,9 @@ def _matchAndTimeInitialTracks(groundtruthList, runElement, threshold):
         estimatedTrackID = estimatedTrack.get(idTag)
         falseTrackIdSet.add(estimatedTrackID)
         estimatedTrackStatesElement = estimatedTrack.find(statesTag)
+        stateElementList = estimatedTrackStatesElement.findall(stateTag)
+        for s in stateElementList[1:-1]:
+            estimatedTrackStatesElement.remove(s)
         firstStateElement = estimatedTrackStatesElement.find(stateTag)
         stateTime = firstStateElement.get(timeTag)
         firstStateList.append((stateTime, estimatedTrackID, firstStateElement))
