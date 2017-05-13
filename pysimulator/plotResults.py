@@ -10,6 +10,7 @@ def plotResults(filePathList, initFilePathList):
         pool.map(resultsPlotter.plotTrackLoss, filePathList)
         pool.map(resultsPlotter.plotTrackingPercentage, filePathList)
         pool.map(resultsPlotter.plotInitializationTime, initFilePathList)
+        pool.map(resultsPlotter.plotRuntime, filePathList)
 
 if __name__ == '__main__':
     from pysimulator.simulationConfig import trackingFilePathList, initFilePathList
