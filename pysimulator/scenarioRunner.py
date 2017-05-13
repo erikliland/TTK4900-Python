@@ -17,7 +17,6 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
         scenarioElement = None
 
     if kwargs.get('overwrite', False) or (scenarioElement is None):
-        print("Creating scenarioElement", scenario.name)
         scenarioElement = ET.Element(scenarioTag, attrib={nameTag: scenario.name})
         simList.storeGroundTruth(scenarioElement, scenario)
         scenario.storeScenarioSettings(scenarioElement)
@@ -25,10 +24,8 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
     variationsElement = scenarioElement.find('.{0:}[@{1:}="True"]'.format(variationsTag, preinitializedTag))
 
     if variationsElement is None:
-        # print("Creating variationsElement", True)
         variationsElement = ET.SubElement(
             scenarioElement,variationsTag,attrib={preinitializedTag: "True"})
-    # print("variationsElement",variationsElement.attrib)
     for P_d in pdList:
         for lambda_phi in lambdaphiList:
             for N in nList:
@@ -39,11 +36,10 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
                     '.{0:}[@{1:}="{4:}"][@{2:}="{5:}"][@{3:}="{6:}"]'.format(
                         variationTag, nTag, pdTag, lambdaphiTag, N, P_d, lambda_phi))
                 if variationElement is None:
-                    print("Creating variationElement", variationDict)
                     variationElement = ET.SubElement(
                         variationsElement, variationTag,
                         attrib={str(k): str(v) for k, v in variationDict.items()})
-                # print("variationElement", variationElement.attrib)
+                print(scenario.name, variationElement.attrib, nMonteCarlo, True)
                 runMonteCarloSimulations(
                     variationElement, scenario, simList, nMonteCarlo, baseSeed,
                     variationDict, True, **kwargs)
@@ -61,7 +57,6 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
         scenarioElement = None
 
     if kwargs.get('overwrite', False) or (scenarioElement is None):
-        print("Creating scenarioElement", scenario.name)
         scenarioElement = ET.Element(scenarioTag, attrib={nameTag: scenario.name})
         simList.storeGroundTruth(scenarioElement, scenario)
         scenario.storeScenarioSettings(scenarioElement)
@@ -70,10 +65,8 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
         '.{0:}[@{1:}="False"]'.format(variationsTag, preinitializedTag))
 
     if variationsElement is None:
-        # print("Creating variationsElement", False)
         variationsElement = ET.SubElement(
             scenarioElement,variationsTag,attrib={preinitializedTag: "False"})
-    # print("variationsElement",variationsElement.attrib)
     for P_d in pdList:
         for lambda_phi in lambdaphiList:
             for (M, N) in M_N_list:
@@ -89,7 +82,7 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
                     variationElement = ET.SubElement(
                         variationsElement, variationTag,
                         attrib={str(k): str(v) for k, v in variationDict.items()})
-                print("variationElement", variationElement.attrib)
+                print(scenario.name, variationElement.attrib, nMonteCarlo, False)
                 runMonteCarloSimulations(
                     variationElement, scenario, simList, nMonteCarlo, baseSeed,
                     variationDict, False, **kwargs)
