@@ -97,9 +97,8 @@ def plotInitializationTime(loadFilePath):
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
     scenarioSettingsElement = scenarioElement.find(scenariosettingsTag)
-    variationsElement = scenarioElement.find('.Variations[@preinitialized="False"]')
+    variationsElement = scenarioElement.find('.{0:}[@{1:}="{2:}"]'.format(variationsTag, preinitializedTag, False))
     variationsInitLog = _getInitializationTimePlotData(variationsElement)
-    # print("variationsInitLog", *[str(k)+str(v) for k,v in variationsInitLog.items()], sep="\n")
     simLength = float(scenarioSettingsElement.find("simTime").text)
     timeStep = float(scenarioSettingsElement.find("radarPeriod").text)
     nTargets = len(groundtruthElement.findall(trackTag))
@@ -121,8 +120,19 @@ def plotTrackCorrectness(loadFilePath):
 
 def plotRuntime(loadFilePath):
     if loadFilePath is None: return
+    print("plotRuntime", loadFilePath)
+    savePath = _getSavePath(loadFilePath, "Runtime")
+    tree = ET.parse(loadFilePath)
+    scenarioElement = tree.getroot()
+    groundtruthElement = scenarioElement.find(groundtruthTag)
+    scenarioSettingsElement = scenarioElement.find(scenariosettingsTag)
+    variationsElement = scenarioElement.find(
+        '.{0:}[@{1:}="{2:}"]'.format(variationsTag, preinitializedTag, True))
+    runtimeLog = _getRuntimePlotData(variationsElement, percentile=10.)
+    # print("runtimeLog", *[str(k)+str(v) for k,v in runtimeLog.items()], sep="\n")
+    figure = _plotTimeLog(runtimeLog)
+    figure.savefig(savePath)
     plt.close()
-    pass
 
 def _getTrackLossPlotData(groundtruthElement, variationsElement):
     trueIdList = [t.get(idTag)
@@ -252,6 +262,42 @@ def _getTrackingCorrectnessPlotData(variationsElement):
 
     return plotData
 
+def _getRuntimePlotData(variationsElement, percentile):
+    variationList = variationsElement.findall(variationTag)
+    plotData = {}
+    for variation in variationList:
+        N = float(variation.get(nTag))
+        P_d = float(variation.get(pdTag))
+        lambda_phi = float(variation.get(lambdaphiTag))
+        runtimeList = []
+        for runElement in variation.findall(runTag):
+            runtimeElement = runElement.find(runtimeTag)
+            totalElement = runtimeElement.find(totalTimeTag)
+            totalTimeString = totalElement.text
+            totalTimeString = totalTimeString.strip('[]')
+            totalTimeStringList = totalTimeString.split()
+            totalTimeList = np.array(totalTimeStringList, dtype=np.float64)
+            runtimeList.append(totalTimeList)
+        runtimeArray = np.array(runtimeList, ndmin=2, dtype=np.float64)
+        meanRuntimeArray = np.mean(runtimeArray, axis=0)
+        percentiles = np.percentile(meanRuntimeArray,[percentile, 100.-percentile])
+        meanRuntime = np.mean(meanRuntimeArray)
+        # print("runtimeArray", np.array_str(runtimeArray, precision=6))
+        # print("meanRunetimeArray", np.array_str(meanRuntimeArray, precision=6))
+        # print("Percentile", np.array_str(percentiles, precision=6))
+        # print()
+        # plt.hist(meanRuntimeArray)
+        # plt.show()
+        if P_d not in plotData:
+            plotData[P_d] = {}
+        if lambda_phi not in plotData[P_d]:
+            plotData[P_d][lambda_phi] = {}
+        if N not in plotData[P_d][lambda_phi]:
+            plotData[P_d][lambda_phi][N] = (meanRuntime, percentiles)
+        else:
+            raise KeyError("Duplicate key found")
+    return plotData
+
 def _plotTrackLossPercentage(plotData):
     figure = plt.figure(figsize=(10, 10), dpi=100)
     colors = sns.color_palette(n_colors=5)
@@ -326,7 +372,6 @@ def _plotTrackingPercentage(plotData):
             x = np.array(x)
             y = np.array(y)
             x, y = (list(t) for t in zip(*sorted(zip(x, y))))
-
             trackingPercentageList.append((P_d, N, x, y))
 
     trackingPercentageList.sort(key=lambda tup: float(tup[1]), reverse=True)
@@ -364,15 +409,13 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
     for M_init, d1 in plotData.items():
         for N_init, d2 in d1.items():
             figure1 = plt.figure(figsize=(10, 14), dpi=100)
-            # figure2 = plt.figure(figsize=(10, 6), dpi=100)
 
             ax11 = figure1.add_subplot(311)
             ax12 = figure1.add_subplot(312)
             ax13 = figure1.add_subplot(313)
 
             sns.set_style(style='white')
-            savePath1 = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
-            # savePath2 = _getSavePath(loadFilePath, "Time({0:}-{1:})_persistent".format(M_init, N_init))
+            savePath = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
             cpfmList = []
             falseCPFMlist = []
             accFalseTrackList = []
@@ -464,13 +507,49 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
             sns.despine(ax=ax13, offset=0)
 
             figure1.tight_layout()
-            figure1.savefig(savePath1)
+            figure1.savefig(savePath)
             figure1.clf()
 
             plt.close()
 
 def _plotTrackingCorrectness(plotData):
     return plt.figure()
+
+def _plotTimeLog(plotData):
+    figure = plt.figure(figsize=(10, 10), dpi=100)
+    ax = figure.gca()
+    sns.set_style(style='white')
+
+    nSet = set()
+    for j, P_d in enumerate(sorted(plotData, reverse=True)):
+        d1 = plotData[P_d]
+        for i, lambda_phi in enumerate(sorted(d1)):
+            d2 = d1[lambda_phi]
+            x = []
+            y = []
+            for N, (meanRuntime, percentiles) in d2.items():
+                x.append(N)
+                y.append(meanRuntime)
+                nSet.add(N)
+            x = np.array(x)
+            y = np.array(y)
+            x, y = (list(t) for t in zip(*sorted(zip(x, y))))
+            ax.plot(x,y, linestyle=linestyleList[i], color=colors[j],
+                     label="$P_D$={0:}, $\lambda_\phi$={1:}".format(P_d, lambda_phi))
+
+    ax.set_xlim(ax.get_xlim()[0]-0.5, ax.get_xlim()[1]+0.5)
+    ax.set_ylim(0,1)
+    ax.set_title("Tracking iteration runtime", fontsize=18)
+    ax.set_xlabel("N", fontsize=14)
+    ax.set_ylabel("Average iteration runtime [s]", fontsize=14)
+    ax.xaxis.set_ticks(sorted(list(nSet)))
+
+    ax.legend(loc=0)
+    ax.grid(False)
+
+    sns.despine(ax=ax)
+    figure.tight_layout()
+    return figure
 
 def _getSavePath(loadFilePath, nameAdd):
     head, tail = os.path.split(loadFilePath)
