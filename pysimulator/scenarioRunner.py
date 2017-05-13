@@ -70,7 +70,7 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
         '.{0:}[@{1:}="False"]'.format(variationsTag, preinitializedTag))
 
     if variationsElement is None:
-        print("Creating variationsElement", False)
+        # print("Creating variationsElement", False)
         variationsElement = ET.SubElement(
             scenarioElement,variationsTag,attrib={preinitializedTag: "False"})
     # print("variationsElement",variationsElement.attrib)
