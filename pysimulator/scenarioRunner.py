@@ -25,10 +25,10 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
     variationsElement = scenarioElement.find('.{0:}[@{1:}="True"]'.format(variationsTag, preinitializedTag))
 
     if variationsElement is None:
-        print("Creating variationsElement", True)
+        # print("Creating variationsElement", True)
         variationsElement = ET.SubElement(
             scenarioElement,variationsTag,attrib={preinitializedTag: "True"})
-    print("variationsElement",variationsElement.attrib)
+    # print("variationsElement",variationsElement.attrib)
     for P_d in pdList:
         for lambda_phi in lambdaphiList:
             for N in nList:
@@ -43,7 +43,7 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
                     variationElement = ET.SubElement(
                         variationsElement, variationTag,
                         attrib={str(k): str(v) for k, v in variationDict.items()})
-                print("variationElement", variationElement.attrib)
+                # print("variationElement", variationElement.attrib)
                 runMonteCarloSimulations(
                     variationElement, scenario, simList, nMonteCarlo, baseSeed,
                     variationDict, True, **kwargs)
@@ -73,7 +73,7 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
         print("Creating variationsElement", False)
         variationsElement = ET.SubElement(
             scenarioElement,variationsTag,attrib={preinitializedTag: "False"})
-    print("variationsElement",variationsElement.attrib)
+    # print("variationsElement",variationsElement.attrib)
     for P_d in pdList:
         for lambda_phi in lambdaphiList:
             for (M, N) in M_N_list:
