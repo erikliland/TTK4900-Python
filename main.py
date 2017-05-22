@@ -19,9 +19,10 @@ def runSimulation(**kwargs):
     avgToc = []
     tic0 = time.time()
 
-    scenario = simulationConfig.scenarioList[2]
+    scenario = simulationConfig.scenarioList[1]
 
-    seed = simulationConfig.baseSeed + 2
+    i=5
+    seed = simulationConfig.baseSeed + i - 1
     # p0 = np.array([100., -100.])
     # radarRange = 5500.0  # meters
     # maxSpeed = 22.0  # meters / second
@@ -32,14 +33,14 @@ def runSimulation(**kwargs):
     simTime = scenario.radarPeriod * 60  # sec
     # nScans = int(simTime / radarPeriod)
     # nSimulationSteps = int(simTime / simulationTimeStep)
-    lambda_phi = 8e-6
+    lambda_phi = 0e-5
     # lambda_nu = 0.0002
-    P_d = 0.6  # Probability of detection
+    P_d = 0.99 # Probability of detection
     N = 6  # Number of  timesteps to tail (N-scan)
     # eta2 = 5.99  # 95% confidence
-    M_required = 2
-    N_checks = 3
-    preInitialized = True
+    M_required = 3
+    N_checks = 4
+    preInitialized = kwargs.get('preInitialized',False)
 
     if kwargs.get('printInitialTargets', False):
         print("Initial targets:")
@@ -57,7 +58,7 @@ def runSimulation(**kwargs):
     trackerArgs = (scenario.model,
                    scenario.radarPeriod,
                    lambda_phi,
-                   lambda_nu)
+                   scenario.lambda_nu)
 
     trackerKwargs = {'maxSpeedMS': maxSpeedMS,
                      'M_required': M_required,
@@ -89,7 +90,7 @@ def runSimulation(**kwargs):
         time.sleep(0.1)
 
         startIndex = 0
-        if kwargs.get('preInitialize', False):
+        if kwargs.get('preInitialized', False):
             tracker.preInitialize(simList)
             startIndex = 1
 
@@ -100,13 +101,16 @@ def runSimulation(**kwargs):
 
             tracker.addMeasurementList(measurementList,
                                        aisPredictions,
-                                       printTime=False,
-                                       printAssociation=False,
+                                       printTime=True,
                                        printCluster=False,
-                                       checkIntegrity=False,
                                        dynamicWindow=False,
                                        pruneSimilar=False,
                                        **kwargs)
+            # print("CNLLR", ["{:.2f}".format(n.cumulativeNLLR) for n in tracker.__trackNodes__])
+            # print("CNLLR/n", ["{:.2}".format(n.score) for n in tracker.__trackNodes__])
+            # print("RootHeight", [n.rootHeight() for n in tracker.__trackNodes__])
+            # print("Node1", tracker.__trackNodes__[-1])
+            # print("Root", *[n.getRoot() for n in tracker.__trackNodes__ if n.ID == 16])
             toc = time.time() - tic
             # print("H",tracker.__trackNodes__[7].measurementNumber,": ",tracker.__trackNodes__[7].cumulativeNLLR)
             # print("TrackNode", tracker.__trackNodes__[7])
@@ -127,7 +131,7 @@ def runSimulation(**kwargs):
         p.strip_dirs().sort_stats('time').print_stats(20)
         p.strip_dirs().sort_stats('cumulative').print_stats(20)
     else:
-        simulate(tracker, simList, scanList, minToc, maxToc, avgToc, preInitialize=preInitialized)
+        simulate(tracker, simList, scanList, minToc, maxToc, avgToc, **kwargs)
 
     if kwargs.get('printTargetList', False):
         tracker.printTargetList()
@@ -148,11 +152,14 @@ def runSimulation(**kwargs):
         variationsElement = ET.SubElement(scenarioElement, variationsTag, attrib={preinitializedTag: str(preInitialized)})
         variationDict = {pdTag: P_d,
                          lambdaphiTag: lambda_phi,
-                         nTag: N}
+                         nTag: N,
+                         mInitTag: M_required,
+                         nInitTag: N_checks}
+
         variationElement = ET.SubElement(variationsElement,
                                          variationTag,
                                          attrib={str(k): str(v) for k, v in variationDict.items()})
-        tracker._storeRun(variationElement, preInitialized)
+        tracker._storeRun(variationElement, preInitialized, i=i, seed=seed)
         path = kwargs.get('exportPath')
         hpf.writeElementToFile(path, scenarioElement)
         print(path)
@@ -166,6 +173,7 @@ def runSimulation(**kwargs):
         from pysimulator import resultsPlotter
         resultsPlotter.plotTrackingPercentage(path1)
         resultsPlotter.plotInitializationTime(path2)
+        resultsPlotter.plotRuntime(path1)
 
     if kwargs.get('plot'):
         import matplotlib.pyplot as plt
@@ -189,15 +197,15 @@ def runSimulation(**kwargs):
         # tracker.plotStatesFromRoot(dummy=False, real=False, ais=True)
         # tracker.plotMeasurementsFromTracks(labels = False, dummy = True, real = True)
         # tracker.plotLastScan()
-        # tracker.plotAllScans(stepsBack=N)
+        # tracker.plotAllScans()
         # tracker.plotLastAisUpdate()
         # tracker.plotAllAisUpdates(stepsBack=N)
         # tracker.plotHypothesesTrack(colors=colors3, markStates=True)  # CAN BE SLOW!
         tracker.plotActiveTracks(colors=colors2, markInitial=True, labelInitial=True, markRoot=False,
-                                 markStates=False, real=True, dummy=True, ais=True, smooth=False)
+                                 markStates=True, real=True, dummy=True, ais=True, smooth=False)
         # tracker.plotActiveTracks(colors=colors2, markInitial=False, markRoot=False, markStates=False, real=False,
         #                          dummy=False, ais=False, smooth=True, markEnd=False)
-        tracker.plotTerminatedTracks(markStates=False, real=False, dummy=False, ais=False, markInitial=True)
+        tracker.plotTerminatedTracks(markStates=True, real=True, dummy=True, ais=True, markInitial=True)
 
         plt.axis("equal")
         plt.xlim((scenario.p0[0] - scenario.radarRange * 1.05,
@@ -222,13 +230,15 @@ if __name__ == '__main__':
     exportPath = os.path.join(os.path.expanduser(
         '~'), 'TTK4900-Python', 'data', 'test.xml')
     print("Storing at", exportPath)
-    runSimulation(plot=False,
+    runSimulation(plot=True,
                   profile=False,
                   printInitialTargets=False,
                   printTargetList=False,
                   printScanList=False,
                   printAssociation=False,
                   printAISList=False,
+                  checkIntegrity=False,
                   exportPath=exportPath,
+                  preInitialized=False,
                   **args)
     print("-" * 100)
