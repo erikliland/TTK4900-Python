@@ -8,11 +8,18 @@ import os
 import numpy as np
 import csv
 import ast
-import simulationConfig
+from pysimulator import simulationConfig
 from pysimulator.scenarios.scenarios import scenarioList
 
 colors = sns.color_palette(n_colors=5)
 linestyleList = ['-','--','-.', ':']
+legendFontsize = 7
+labelFontsize = 8
+titleFontsize = 10
+figureWidth = 13.0*0.4 #inch
+fullPageHeight = 18.0*0.4 #inch
+halfPageHeight = 8.0 * 0.4 #inch
+linewidth = 1
 
 def exportInitialState():
     filePath = os.path.join(simulationConfig.path, 'plots', "Scenario_Initial_State.csv")
@@ -56,7 +63,7 @@ def plotTrueTracks():
     hpf.plotRadarOutline(scenario.p0, scenario.radarRange, markCenter=False)
     plt.xlabel("East [m]")
     plt.ylabel("North [m]")
-    plt.title("True tracks", fontsize=18)
+    plt.title("True tracks", fontsize=titleFontsize)
     plt.grid(True)
     filePath = os.path.join(simulationConfig.path, 'plots', "ScenarioTruth.pdf")
     plt.tight_layout()
@@ -149,7 +156,7 @@ def _getTrackLossPlotData(groundtruthElement, variationsElement):
             trackLossList = np.array([t.get(losttrackTag)
                                       for t in trackList
                                       if t.get(matchidTag) in trueIdList])
-            trackLossList = trackLossList == str(True)
+            trackLossList =  trackLossList == str(True)
             trackLossPercentageList.append((np.sum(trackLossList)/len(trackLossList))*100)
 
         trackLossPercentageMean = np.mean(np.array(trackLossPercentageList))
@@ -299,7 +306,7 @@ def _getRuntimePlotData(variationsElement, percentile):
     return plotData
 
 def _plotTrackLossPercentage(plotData):
-    figure = plt.figure(figsize=(10, 10), dpi=100)
+    figure = plt.figure(figsize=(figureWidth,halfPageHeight), dpi=600)
     colors = sns.color_palette(n_colors=5)
     sns.set_style(style='white')
     ax = figure.gca()
@@ -335,24 +342,24 @@ def _plotTrackLossPercentage(plotData):
                 label = "$P_D$={0:}, N={1:.0f}".format(P_d, N),
                 c = colors[len(nSet)-1],
                 linestyle=linestyleList[len(pdSet)-1],
-                linewidth = 2)
+                linewidth = linewidth)
     lambdaPhiList = list(lambdaPhiSet)
     lambdaPhiList.sort()
 
-    ax.legend(loc=0, ncol=len(pdSet), fontsize=18)
-    ax.set_xlabel("$\lambda_{\phi}$", fontsize=18)
-    ax.set_ylabel("Track loss (%)", fontsize=18)
+    ax.legend(loc=0, ncol=len(pdSet), fontsize=legendFontsize)
+    ax.set_xlabel("$\lambda_{\phi}$", fontsize=labelFontsize)
+    ax.set_ylabel("Track loss (%)", fontsize=labelFontsize)
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
     ax.set_ylim(0, 30)
-    ax.tick_params(labelsize=16, pad=8)
+    ax.tick_params(labelsize=labelFontsize)
     yStart, yEnd = ax.get_ylim()
     ax.yaxis.set_ticks(np.arange(yStart, yEnd * 1.01, 10))
     ax.xaxis.set_ticks(lambdaPhiList)
-    figure.tight_layout()
+    figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
     return figure
 
 def _plotTrackingPercentage(plotData):
-    figure = plt.figure(figsize=(10, 10), dpi=100)
+    figure = plt.figure(figsize=(figureWidth, halfPageHeight), dpi=600)
     sns.set_style(style='white')
     ax = figure.gca()
 
@@ -388,31 +395,31 @@ def _plotTrackingPercentage(plotData):
                 label="$P_D$={0:}, N={1:.0f}".format(P_d, N),
                 c=colors[len(nSet) - 1],
                 linestyle=linestyleList[len(pdSet) - 1],
-                linewidth=2)
+                linewidth=linewidth)
 
     lambdaPhiList = list(lambdaPhiSet)
     lambdaPhiList.sort()
 
-    ax.legend(loc=0, ncol=len(pdSet), fontsize=18)
-    ax.set_xlabel("$\lambda_{\phi}$", fontsize=18)
-    ax.set_ylabel("\nAverage tracking percentage", fontsize=18)
+    ax.legend(loc=0, ncol=len(pdSet), fontsize=legendFontsize)
+    ax.set_xlabel("$\lambda_{\phi}$", fontsize=labelFontsize)
+    ax.set_ylabel("\nAverage tracking percentage", fontsize=labelFontsize)
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
-    ax.set_ylim(ax.get_ylim()[0], 100.01)
-    ax.tick_params(labelsize=16, pad=8)
+    ax.set_ylim(20, 100.01)
+    ax.tick_params(labelsize=labelFontsize)
     sns.despine(ax=ax, offset=0)
     ax.xaxis.set_ticks(lambdaPhiList)
-    figure.tight_layout()
+    figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
     return figure
 
 def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTargets):
     timeArray = np.arange(0, simLength, timeStep)
     for M_init, d1 in plotData.items():
         for N_init, d2 in d1.items():
-            figure1 = plt.figure(figsize=(10, 14), dpi=100)
+            figure = plt.figure(figsize=(figureWidth, fullPageHeight), dpi=600)
 
-            ax11 = figure1.add_subplot(311)
-            ax12 = figure1.add_subplot(312)
-            ax13 = figure1.add_subplot(313)
+            ax11 = figure.add_subplot(311)
+            ax12 = figure.add_subplot(312)
+            ax13 = figure.add_subplot(313)
 
             sns.set_style(style='white')
             savePath = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
@@ -456,7 +463,8 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                         cpmf,
                         label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                         c=colors[len(pdSet)-1],
-                        linestyle=linestyleList[len(lambdaPhiSet)-1])
+                        linestyle=linestyleList[len(lambdaPhiSet)-1],
+                        linewidth=linewidth)
 
             pdSet = set()
             lambdaPhiSet = set()
@@ -469,7 +477,8 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                         cpmf+(1e-10),
                         label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                         c=colors[len(pdSet)-1],
-                        linestyle=linestyleList[len(lambdaPhiSet)-1])
+                        linestyle=linestyleList[len(lambdaPhiSet)-1],
+                        linewidth=linewidth)
 
             pdSet = set()
             lambdaPhiSet = set()
@@ -482,33 +491,43 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                           accFalseTrack,
                          label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                          c=colors[len(pdSet) - 1],
-                         linestyle=linestyleList[len(lambdaPhiSet) - 1])
+                         linestyle=linestyleList[len(lambdaPhiSet) - 1],
+                            linewidth=linewidth)
 
-            ax11.set_xlabel("Time [s]", fontsize=14)
-            ax11.set_ylabel("Average cpfm", fontsize=14, linespacing=3)
-            ax11.set_title("Cumulative Probability Mass Function", fontsize=18)
-            ax11.legend(loc=4, ncol=len(pdSet))
+            ax11.set_xlabel("Time [s]", fontsize=labelFontsize)
+            ax11.set_ylabel("Average cpfm", fontsize=labelFontsize)
+            ax11.set_title("Cumulative Probability Mass Function", fontsize=titleFontsize)
+            ax11.legend(loc=4, ncol=len(pdSet), fontsize=legendFontsize)
             ax11.grid(False)
+            ax11.set_xlim(0, simLength)
             ax11.set_ylim(0,1)
+            ax11.xaxis.set_ticks(np.arange(0,simLength+15, 15))
+            ax11.tick_params(labelsize=labelFontsize)
             sns.despine(ax=ax11, offset=0)
 
-            ax12.set_xlabel("Time [s]", fontsize=14)
-            ax12.set_ylabel("Average number of tracks", fontsize=14, linespacing=2)
-            ax12.set_title("Accumulative number of erroneous tracks", fontsize=18)
-            ax12.set_ylim(1e-2,100)
+            ax12.set_xlabel("Time [s]", fontsize=labelFontsize)
+            ax12.set_ylabel("Average number of tracks", fontsize=labelFontsize)
+            ax12.set_title("Accumulative number of erroneous tracks", fontsize=titleFontsize)
             ax12.grid(False)
+            ax12.set_xlim(0, simLength)
+            ax12.set_ylim(1e-2,150)
+            ax12.xaxis.set_ticks(np.arange(0,simLength+15, 15))
+            ax12.tick_params(labelsize=labelFontsize)
             sns.despine(ax=ax12, offset=0)
 
-            ax13.set_xlabel("Time [s]", fontsize=14)
-            ax13.set_ylabel("Average number of tracks", fontsize=14, linespacing=2)
-            ax13.set_title("Number of erroneous tracks alive", fontsize=18)
+            ax13.set_xlabel("Time [s]", fontsize=labelFontsize)
+            ax13.set_ylabel("Average number of tracks", fontsize=labelFontsize)
+            ax13.set_title("Number of erroneous tracks alive", fontsize=titleFontsize)
             ax13.grid(False)
+            ax13.set_xlim(0, simLength)
             ax13.set_ylim(-0.02, max(1,ax13.get_ylim()[1]))
+            ax13.xaxis.set_ticks(np.arange(0,simLength+15, 15))
+            ax13.tick_params(labelsize=labelFontsize)
             sns.despine(ax=ax13, offset=0)
 
-            figure1.tight_layout()
-            figure1.savefig(savePath)
-            figure1.clf()
+            figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
+            figure.savefig(savePath)
+            figure.clf()
 
             plt.close()
 
@@ -516,7 +535,7 @@ def _plotTrackingCorrectness(plotData):
     return plt.figure()
 
 def _plotTimeLog(plotData):
-    figure = plt.figure(figsize=(10, 10), dpi=100)
+    figure = plt.figure(figsize=(figureWidth, halfPageHeight), dpi=600)
     ax = figure.gca()
     sns.set_style(style='white')
 
@@ -535,20 +554,22 @@ def _plotTimeLog(plotData):
             y = np.array(y)
             x, y = (list(t) for t in zip(*sorted(zip(x, y))))
             ax.plot(x,y, linestyle=linestyleList[i], color=colors[j],
-                     label="$P_D$={0:}, $\lambda_\phi$={1:}".format(P_d, lambda_phi))
+                     label="$P_D$={0:}, $\lambda_\phi$={1:}".format(P_d, lambda_phi),
+                    linewidth=linewidth)
 
     ax.set_xlim(ax.get_xlim()[0]-0.5, ax.get_xlim()[1]+0.5)
     ax.set_ylim(0,1)
-    ax.set_title("Tracking iteration runtime", fontsize=18)
-    ax.set_xlabel("N", fontsize=14)
-    ax.set_ylabel("Average iteration runtime [s]", fontsize=14)
+    ax.set_title("Tracking iteration runtime", fontsize=titleFontsize)
+    ax.set_xlabel("N", fontsize=labelFontsize, labelpad=0)
+    ax.set_ylabel("Average iteration time [s]", fontsize=labelFontsize)
     ax.xaxis.set_ticks(sorted(list(nSet)))
+    ax.tick_params(labelsize=labelFontsize)
 
-    ax.legend(loc=0)
+    ax.legend(loc=0, fontsize=legendFontsize)
     ax.grid(False)
 
     sns.despine(ax=ax)
-    figure.tight_layout()
+    figure.tight_layout(pad=0.5, h_pad=0.5, w_pad=0.5)
     return figure
 
 def _getSavePath(loadFilePath, nameAdd):
