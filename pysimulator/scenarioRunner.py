@@ -9,6 +9,7 @@ import datetime
 
 def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nMonteCarlo,
                                 baseSeed, **kwargs):
+    changes = False
     simList = scenario.getSimList()
 
     try:
@@ -20,10 +21,12 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
         scenarioElement = ET.Element(scenarioTag, attrib={nameTag: scenario.name})
         simList.storeGroundTruth(scenarioElement, scenario)
         scenario.storeScenarioSettings(scenarioElement)
+        changes = True
 
     variationsElement = scenarioElement.find('.{0:}[@{1:}="True"]'.format(variationsTag, preinitializedTag))
 
     if variationsElement is None:
+        changes = True
         variationsElement = ET.SubElement(
             scenarioElement,variationsTag,attrib={preinitializedTag: "True"})
     for P_d in pdList:
@@ -36,19 +39,21 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
                     '.{0:}[@{1:}="{4:}"][@{2:}="{5:}"][@{3:}="{6:}"]'.format(
                         variationTag, nTag, pdTag, lambdaphiTag, N, P_d, lambda_phi))
                 if variationElement is None:
+                    changes = True
                     variationElement = ET.SubElement(
                         variationsElement, variationTag,
                         attrib={str(k): str(v) for k, v in variationDict.items()})
                 print(scenario.name, variationElement.attrib, nMonteCarlo, True)
-                runMonteCarloSimulations(
+                changes |= runMonteCarloSimulations(
                     variationElement, scenario, simList, nMonteCarlo, baseSeed,
                     variationDict, True, **kwargs)
-
-    _renameOldFiles(path)
-    hpf.writeElementToFile(path, scenarioElement)
+    if changes:
+        _renameOldFiles(path)
+        hpf.writeElementToFile(path, scenarioElement)
 
 def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list, nMonteCarlo,
                                 baseSeed, **kwargs):
+    changes = True
     simList = scenario.getSimList()
 
     try:
@@ -57,6 +62,7 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
         scenarioElement = None
 
     if kwargs.get('overwrite', False) or (scenarioElement is None):
+        changes = True
         scenarioElement = ET.Element(scenarioTag, attrib={nameTag: scenario.name})
         simList.storeGroundTruth(scenarioElement, scenario)
         scenario.storeScenarioSettings(scenarioElement)
@@ -65,6 +71,7 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
         '.{0:}[@{1:}="False"]'.format(variationsTag, preinitializedTag))
 
     if variationsElement is None:
+        changes = True
         variationsElement = ET.SubElement(
             scenarioElement,variationsTag,attrib={preinitializedTag: "False"})
     for P_d in pdList:
@@ -79,16 +86,17 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
                     '.{0:}[@{1:}="{5:}"][@{2:}="{6:}"][@{3:}="{7:}"][@{4:}="{8:}"]'.format(
                         variationTag, mInitTag, nInitTag, pdTag, lambdaphiTag, M, N, P_d, lambda_phi))
                 if variationElement is None:
+                    changes = True
                     variationElement = ET.SubElement(
                         variationsElement, variationTag,
                         attrib={str(k): str(v) for k, v in variationDict.items()})
                 print(scenario.name, variationElement.attrib, nMonteCarlo, False)
-                runMonteCarloSimulations(
+                changes |= runMonteCarloSimulations(
                     variationElement, scenario, simList, nMonteCarlo, baseSeed,
                     variationDict, False, **kwargs)
-
-    _renameOldFiles(path)
-    hpf.writeElementToFile(path, scenarioElement)
+    if changes:
+        _renameOldFiles(path)
+        hpf.writeElementToFile(path, scenarioElement)
 
 def _renameOldFiles(path):
     if os.path.exists(path):
@@ -102,6 +110,7 @@ def _renameOldFiles(path):
 
 def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed,
                              variationDict, preInitialized, **kwargs):
+    changes = False
     P_d = variationDict[pdTag]
     lambda_phi = variationDict[lambdaphiTag]
     N = variationDict[nTag]
@@ -109,7 +118,7 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
     trackerArgs = (scenario.model,
                    scenario.radarPeriod,
                    lambda_phi,
-                   lambda_nu)
+                   scenario.lambda_nu)
 
     trackerKwargs = {'maxSpeedMS': maxSpeedMS,
                      'M_required': variationDict.get(mInitTag,M_required),
@@ -118,10 +127,11 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
                      'radarRange': scenario.radarRange,
                      'eta2': eta2,
                      'N': N,
-                     'P_d': scenario.P_d_true,
+                     'P_d': P_d,
                      'dynamicWindow': False}
     trackersettingsElement = variationElement.find(trackerSettingsTag)
     if trackersettingsElement is None:
+        changes = True
         storeTrackerData(variationElement, trackerArgs, trackerKwargs)
     for i in range(nSim):
         runElement = variationElement.find(
@@ -133,7 +143,7 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
         seed = baseSeed + i
         scanList, aisList = scenario.getSimulatedScenario(seed, simList, lambda_phi, P_d,
                                                           localClutter=False)
-
+        changes = True
         try:
             runSimulation(variationElement, simList, scanList, aisList, trackerArgs,
                           trackerKwargs, preInitialized,seed=seed, **kwargs)
@@ -145,6 +155,8 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
             print("Iteration", i)
             print("Seed", seed)
             print(e)
+
+    return changes
 
 def runSimulation(variationElement, simList, scanList, aisList, trackerArgs,
                   trackerKwargs, preInitialized, **kwargs):
