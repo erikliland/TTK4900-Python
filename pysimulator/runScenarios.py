@@ -60,26 +60,30 @@ def runScenariosMultiProcessing(trackingScenarioIndices, initScenarioIndices,
         r.get()
 
 
-def runScenariosSingleProcess(trackingFilePathList, initFilePathList, scenarioList,
+def runScenariosSingleProcess(trackingScenarioIndices, initScenarioIndices,
                               pdList, lambdaphiList, nList, M_N_list, nMonteCarlo):
-    for scenario, filePath in zip(scenarioList, trackingFilePathList):
+    for scenarioIndex in trackingScenarioIndices:
+        scenario = scenarioList[scenarioIndex]
+        filePath = trackingFilePathList[scenarioIndex]
         print("Scenario path:", filePath)
         scenarioRunner.runPreinitializedVariations(
             scenario, filePath, pdList, lambdaphiList, nList, nMonteCarlo, baseSeed)
 
-    for scenario, filePath in zip(scenarioList, initFilePathList):
+    for scenarioIndex in initScenarioIndices:
+        scenario = scenarioList[scenarioIndex]
+        filePath = initFilePathList[scenarioIndex]
         print("Scenario path:", filePath)
         scenarioRunner.runInitializationVariations(
             scenario, filePath, pdList, lambdaphiList, M_N_list, nMonteCarlo, baseSeed)
 
 
 def mainSingle():
-    runScenariosSingleProcess(trackingFilePathList, initFilePathList, scenarioList, pdList,
+    runScenariosSingleProcess(range(len(trackingFilePathList)), range(1), pdList,
                               lambdaphiList, nList, M_N_list, nMonteCarlo)
 
 
 def mainMulti():
-    runScenariosMultiProcessing(trackingFilePathList, initFilePathList, scenarioList,
+    runScenariosMultiProcessing(range(len(trackingFilePathList)), range(1),
                                 pdList, lambdaphiList, nList, M_N_list, nMonteCarlo)
 
 
