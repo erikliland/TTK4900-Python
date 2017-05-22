@@ -4,54 +4,54 @@ import multiprocessing as mp
 from pysimulator import scenarioRunner
 
 
-def trackingWorker(scenarioIndex, filePath, pdList, lambdaphiList, nList, nMonteCarlo):
-    print("Starting:", filePath, "Scenario index", scenarioIndex)
+def trackingWorker(scenarioIndex, pdList, lambdaphiList, nList, nMonteCarlo):
     try:
+        filePath = trackingFilePathList[scenarioIndex]
+        print("Starting:", filePath, "Scenario index", scenarioIndex)
         scenarioRunner.runPreinitializedVariations(scenarioList[scenarioIndex],
-                                                         filePath,
-                                                         pdList,
-                                                         lambdaphiList,
-                                                         nList,
-                                                         nMonteCarlo,
-                                                         baseSeed,
-                                                         printLog=False)
+                                                   filePath,
+                                                   pdList,
+                                                   lambdaphiList,
+                                                   nList,
+                                                   nMonteCarlo,
+                                                   baseSeed,
+                                                   printLog=False)
     except Exception as e:
         print(e)
 
-def initWorker(scenarioIndex, filePath, pdList, lambdaphiList, M_N_list, nMonteCarlo):
-    print("Starting:", filePath, "Scenario index", scenarioIndex)
+def initWorker(scenarioIndex, pdList, lambdaphiList, M_N_list, nMonteCarlo):
     try:
+        filePath = initFilePathList[scenarioIndex]
+        print("Starting:", filePath, "Scenario index", scenarioIndex)
         scenarioRunner.runInitializationVariations(scenarioList[scenarioIndex],
-                                                         filePath,
-                                                         pdList,
-                                                         lambdaphiList,
-                                                         M_N_list,
-                                                         nMonteCarlo,
-                                                         baseSeed,
-                                                         printLog=False)
+                                                   filePath,
+                                                   pdList,
+                                                   lambdaphiList,
+                                                   M_N_list,
+                                                   nMonteCarlo,
+                                                   baseSeed,
+                                                   printLog=False)
     except Exception as e:
         print(e)
 
 
-def runScenariosMultiProcessing(filePathList, initFilePathList, scenarios,
+def runScenariosMultiProcessing(trackingScenarioIndices, initScenarioIndices,
                                 pdList, lambdaphiList, nList, M_N_list, nMonteCarlo):
-    nProcesses = 8
+    nProcesses = 5
     pool = mp.Pool(processes=nProcesses)
 
     results = []
-    for scenario, filePath in zip(scenarios, filePathList):
+    for scenarioIndex in trackingScenarioIndices:
         results.append(pool.apply_async(trackingWorker,
-                                        args=[scenarioList.index(scenario),
-                                              filePath,
+                                        args=[scenarioIndex,
                                               pdList,
                                               lambdaphiList,
                                               nList,
                                               nMonteCarlo]))
 
-    for scenario, filePath in zip(scenarios, initFilePathList):
+    for scenarioIndex in initScenarioIndices:
         results.append(pool.apply_async(initWorker,
-                                        args=[scenarioList.index(scenario),
-                                              filePath,
+                                        args=[scenarioIndex,
                                               pdList,
                                               lambdaphiList,
                                               M_N_list,
@@ -84,5 +84,5 @@ def mainMulti():
 
 
 if __name__ == '__main__':
-    runScenariosMultiProcessing(trackingFilePathList, initFilePathList, scenarioList,
+    runScenariosMultiProcessing(range(len(trackingFilePathList)), range(1),
                                 pdList, lambdaphiList, nList, M_N_list, nMonteCarlo)
