@@ -23,6 +23,9 @@ class ScenarioBase:
         self.P_r = 0.9  # Probability of receive (AIS)
         self.model = model
         self.p0 = np.array([100., -100.])  # own position
+        # Expected number of measurements from new targets
+        # per unit area of the measurement space
+        self.lambda_nu = 2e-8
 
         assert self.simulationTimeStep <= self.radarPeriod
         assert self.simTime >= self.simulationTimeStep
@@ -138,7 +141,7 @@ scenario2 = Scenario("Scenario2")
 scenario2.add([-2000, 2100, 4, -4])
 scenario2.add([100, -2000, -2, 8])
 scenario2.add([-4000, 300, 12, -1])
-scenario2.add([-4000, 0, 12, 0], mmsi=257114401, aisClass='A')
+scenario2.add([-4000, 0, 12, 0], mmsi=257114401, aisClass='A', timeOfLastAisMessage=-2.)
 scenario2.add([-4000, -200, 17, 1])
 scenario2.add([4000, -2000, 1, -8])
 scenario2.add([3000, 4000, 2, -8])
