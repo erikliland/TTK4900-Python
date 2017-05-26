@@ -74,7 +74,12 @@ def plotTrackLoss(loadFilePath):
     if loadFilePath is None: return
     print("plotTrackLoss", loadFilePath)
     savePath = _getSavePath(loadFilePath, "TrackLoss")
-    tree = ET.parse(loadFilePath)
+    tree = ET.ElementTree()
+    try:
+        tree.parse(loadFilePath)
+    except FileNotFoundError as e:
+        print(e)
+        return
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
     variationsElement = scenarioElement.findall('.Variations[@preinitialized="True"]')[0]
@@ -88,7 +93,12 @@ def plotTrackingPercentage(loadFilePath):
 
     print("plotTrackingPercentage", loadFilePath)
     savePath = _getSavePath(loadFilePath, "TrackingPercentage")
-    tree = ET.parse(loadFilePath)
+    tree = ET.ElementTree()
+    try:
+        tree.parse(loadFilePath)
+    except FileNotFoundError as e:
+        print(e)
+        return
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
     variationsElement = scenarioElement.findall('.Variations[@preinitialized="True"]')[0]
@@ -100,12 +110,21 @@ def plotTrackingPercentage(loadFilePath):
 def plotInitializationTime(loadFilePath):
     if loadFilePath is None: return
     print("plotInitializationTime", loadFilePath)
-    tree = ET.parse(loadFilePath)
+    tree = ET.ElementTree()
+    try:
+        tree.parse(loadFilePath)
+    except FileNotFoundError as e:
+        print(e)
+        return
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
     scenarioSettingsElement = scenarioElement.find(scenariosettingsTag)
     variationsElement = scenarioElement.find('.{0:}[@{1:}="{2:}"]'.format(variationsTag, preinitializedTag, False))
-    variationsInitLog = _getInitializationTimePlotData(variationsElement)
+    try:
+        variationsInitLog = _getInitializationTimePlotData(variationsElement)
+    except AttributeError:
+        print("It looks like this file is not analyzed. Please run analyseResults() before plotting.")
+        return
     simLength = float(scenarioSettingsElement.find("simTime").text)
     timeStep = float(scenarioSettingsElement.find("radarPeriod").text)
     nTargets = len(groundtruthElement.findall(trackTag))
@@ -116,9 +135,14 @@ def plotTrackCorrectness(loadFilePath):
     if loadFilePath is None: return
     print("plotTrackCorrectness", loadFilePath)
     savePath = _getSavePath(loadFilePath, "TrackingCorrectness")
-    tree = ET.parse(loadFilePath)
+    tree = ET.ElementTree()
+    try:
+        tree.parse(loadFilePath)
+    except FileNotFoundError as e:
+        print(e)
+        return
     scenarioElement = tree.getroot()
-    groundtruthElement = scenarioElement.find(groundtruthTag)
+    # groundtruthElement = scenarioElement.find(groundtruthTag)
     variationsElement = scenarioElement.findall('.Variations[@preinitialized="True"]')[0]
     plotData = _getTrackingCorrectnessPlotData(variationsElement)
     figure = _plotTrackingCorrectness(plotData)
@@ -129,7 +153,12 @@ def plotRuntime(loadFilePath):
     if loadFilePath is None: return
     print("plotRuntime", loadFilePath)
     savePath = _getSavePath(loadFilePath, "Runtime")
-    tree = ET.parse(loadFilePath)
+    tree = ET.ElementTree()
+    try:
+        tree.parse(loadFilePath)
+    except FileNotFoundError as e:
+        print(e)
+        return
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
     scenarioSettingsElement = scenarioElement.find(scenariosettingsTag)
@@ -395,7 +424,8 @@ def _plotTrackingPercentage(plotData):
                 label="$P_D$={0:}, N={1:.0f}".format(P_d, N),
                 c=colors[len(nSet) - 1],
                 linestyle=linestyleList[len(pdSet) - 1],
-                linewidth=linewidth)
+                linewidth=linewidth,
+                marker='*' if len(x)==1 else None)
 
     lambdaPhiList = list(lambdaPhiSet)
     lambdaPhiList.sort()
@@ -404,7 +434,7 @@ def _plotTrackingPercentage(plotData):
     ax.set_xlabel("$\lambda_{\phi}$", fontsize=labelFontsize)
     ax.set_ylabel("\nAverage tracking percentage", fontsize=labelFontsize)
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
-    ax.set_ylim(20, 100.01)
+    ax.set_ylim(0.0, 100.01)
     ax.tick_params(labelsize=labelFontsize)
     sns.despine(ax=ax, offset=0)
     ax.xaxis.set_ticks(lambdaPhiList)
@@ -510,7 +540,7 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
             ax12.set_title("Accumulative number of erroneous tracks", fontsize=titleFontsize)
             ax12.grid(False)
             ax12.set_xlim(0, simLength)
-            ax12.set_ylim(1e-2,150)
+            ax12.set_ylim(1e-3,1000)
             ax12.xaxis.set_ticks(np.arange(0,simLength+15, 15))
             ax12.tick_params(labelsize=labelFontsize)
             sns.despine(ax=ax12, offset=0)

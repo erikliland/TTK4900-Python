@@ -7,12 +7,17 @@ import numpy as np
 def analyzeTrackingFile(filePath):
     if filePath is None: return
     print("Starting:", filePath)
-    tree = ET.parse(filePath)
+    tree = ET.ElementTree()
+    try:
+        tree.parse(filePath)
+    except FileNotFoundError as e:
+        print(e)
+        return
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
-    scenariosettingsElement = scenarioElement.find(scenariosettingsTag)
+    # scenariosettingsElement = scenarioElement.find(scenariosettingsTag)
     variationsList = scenarioElement.findall(variationsTag)
-    print("Scenario name:", scenariosettingsElement.find(nameTag).text)
+    # print("Scenario name:", scenariosettingsElement.find(nameTag).text)
     groundtruthList = groundtruthElement.findall(trackTag)
 
     for variationsElement in variationsList:
@@ -28,12 +33,15 @@ def analyzeInitFile(filePath):
     if filePath is None: return
     print("Starting:", filePath)
     tree = ET.ElementTree()
-    tree.parse(filePath)
+    try:
+        tree.parse(filePath)
+    except FileNotFoundError as e:
+        print(e)
+        return
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
-    scenariosettingsElement = scenarioElement.find(scenariosettingsTag)
+    # scenariosettingsElement = scenarioElement.find(scenariosettingsTag)
     variationsList = scenarioElement.findall(variationsTag)
-    print("Scenario name:", scenariosettingsElement.find(nameTag).text)
     groundtruthList = groundtruthElement.findall(trackTag)
 
     for variationsElement in variationsList:
@@ -77,7 +85,6 @@ def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
         trueTrackStateList = trueTrackStatesElement.findall(stateTag)
         trueTrackID = trueTrack.get(idTag)
         trackLength = len(trueTrackStateList)
-        # trueTrack.set(lengthTag, str(trackLength))
         for estimatedTrack in estimateTrackList:
             estimatedTrackID = estimatedTrack.get(idTag)
             estimatedTrackStatesElement = estimatedTrack.find(statesTag)
@@ -221,8 +228,6 @@ def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshol
     for trueState, estimatedState in zip(trueTrackSlice, estimatedTrackSlice):
         trueTrackPosition = _parsePosition(trueState.find(positionTag))
         estimatedTrackPosition = _parsePosition(estimatedState.find(positionTag))
-        # if np.any(np.isnan(estimatedTrackPosition)): break
-        # if np.any(np.isnan(trueTrackPosition)): break
         delta = trueTrackPosition - estimatedTrackPosition
         deltaNorm = np.linalg.norm(delta)
         deltaList.append(deltaNorm)
@@ -231,8 +236,18 @@ def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshol
     delta2List = []
     for i, (time, delta) in enumerate(zip(timeMatch, deltaList)):
         if delta > threshold:
+            # print("Exceeded threshold")
             if not any([d < threshold for d in deltaList[i+1:]]):
+                # print("Does not converge back")
                 break
+            goodIndices = [i for i, d in enumerate(deltaList[i + 1:]) if d < threshold]
+            if len(goodIndices) <= 1:
+                # print("Convergence is only at one time step")
+                break
+            elif any([d > (threshold * 2) for d in deltaList[i + 1:]]):
+                # print("Future exceeds threshold*2")
+                break
+
         goodTimeMatch.append(time)
         delta2List.append(delta**2)
 

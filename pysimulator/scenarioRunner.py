@@ -34,7 +34,9 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
             for N in nList:
                 variationDict = {pdTag: P_d,
                                  lambdaphiTag: lambda_phi,
-                                 nTag: N}
+                                 nTag: N,
+                                 'localClutter':True,
+                                 'lambda_local':scenario.lambda_local}
                 variationElement = variationsElement.find(
                     '.{0:}[@{1:}="{4:}"][@{2:}="{5:}"][@{3:}="{6:}"]'.format(
                         variationTag, nTag, pdTag, lambdaphiTag, N, P_d, lambda_phi))
@@ -128,18 +130,22 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
                      'eta2': eta2,
                      'N': N,
                      'P_d': P_d,
+                     'localClutter':variationDict.get('localClutter', False),
+                     'lambda_local': variationDict.get('lambda_local',2),
                      'dynamicWindow': False}
     trackersettingsElement = variationElement.find(trackerSettingsTag)
     if trackersettingsElement is None:
         changes = True
         storeTrackerData(variationElement, trackerArgs, trackerKwargs)
+    if kwargs.get('printLog', True):
+        print("Running scenario iteration", end="", flush=True)
     for i in range(nSim):
         runElement = variationElement.find(
         '{0:}[@{1:}="{2:}"]'.format(runTag, iterationTag,i+1))
         if runElement is not None:
             continue
         if kwargs.get('printLog', True):
-            print("Running scenario iteration", i, end="", flush=True)
+            print('.', end="", flush=True)
         seed = baseSeed + i
         scanList, aisList = scenario.getSimulatedScenario(seed, simList, lambda_phi, P_d,
                                                           localClutter=False)
@@ -155,7 +161,8 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
             print("Iteration", i)
             print("Seed", seed)
             print(e)
-
+    if kwargs.get('printLog', True):
+        print()
     return changes
 
 def runSimulation(variationElement, simList, scanList, aisList, trackerArgs,
@@ -171,11 +178,8 @@ def runSimulation(variationElement, simList, scanList, aisList, trackerArgs,
         scanTime = measurementList.time
         aisPredictions = aisList.getMeasurements(scanTime)
         tracker.addMeasurementList(measurementList, aisPredictions, pruneSimilar=not preInitialized)
-        if kwargs.get('printLog', True):
-            print('.', end="", flush=True)
     tracker._storeRun(variationElement, preInitialized, **kwargs)
-    if kwargs.get('printLog', True):
-        print()
+
 
 
 def storeTrackerData(variationElement, trackerArgs, trackerKwargs):
