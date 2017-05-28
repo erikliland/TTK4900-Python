@@ -2,11 +2,8 @@ import logging
 import numpy as np
 import time
 import pymht.tracker as tomht
-from pymht.utils.classDefinitions import Position, SimTarget
-from pymht.pyTarget import Target
-import pymht.utils.simulator as sim
 import pymht.utils.helpFunctions as hpf
-import pymht.models.pv as model
+import matplotlib.pyplot as plt
 from pysimulator import simulationConfig
 from pysimulator.scenarios.defaults import *
 import xml.etree.ElementTree as ET
@@ -19,27 +16,17 @@ def runSimulation(**kwargs):
     avgToc = []
     tic0 = time.time()
 
-    scenario = simulationConfig.scenarioList[1]
+    scenario = simulationConfig.scenarioList[0]
+    print(scenario.name)
 
-    i=5
+    i=4
     seed = simulationConfig.baseSeed + i - 1
-    # p0 = np.array([100., -100.])
-    # radarRange = 5500.0  # meters
-    # maxSpeed = 22.0  # meters / second
-    # radarPeriod = 60. / 24.  # 24 RPM radar / 48 RPM radar
-    # simulationTimeStep = radarPeriod / 2 #sec
-    # # aisPeriod = radarPeriod * 3 #sec
-    # P_r = 0.9 #AIS probability of receive
-    simTime = scenario.radarPeriod * 60  # sec
-    # nScans = int(simTime / radarPeriod)
-    # nSimulationSteps = int(simTime / simulationTimeStep)
-    lambda_phi = 0e-5
-    # lambda_nu = 0.0002
-    P_d = 0.99 # Probability of detection
+    simTime = scenario.radarPeriod * 6  # sec
+    lambda_phi = 2e-5
+    P_d = 0.6 # Probability of detection
     N = 6  # Number of  timesteps to tail (N-scan)
-    # eta2 = 5.99  # 95% confidence
-    M_required = 3
-    N_checks = 4
+    M_required = 2
+    N_checks = 3
     preInitialized = kwargs.get('preInitialized',False)
 
     if kwargs.get('printInitialTargets', False):
@@ -50,10 +37,9 @@ def runSimulation(**kwargs):
 
     if kwargs.get('printSimList', False):
         print("Sim list:")
-        print(*simList, sep="\n", end="\n\n")
+        print(*["\n".join([str(target) for target in targetList]) for targetList in simList], sep="\n\n", end="\n\n")
 
-    scanList, aisList = scenario.getSimulatedScenario(seed, simList, lambda_phi, P_d,
-                                                      localClutter=False)
+    scanList, aisList = scenario.getSimulatedScenario(seed, simList, lambda_phi, P_d,**kwargs)
 
     trackerArgs = (scenario.model,
                    scenario.radarPeriod,
@@ -66,6 +52,7 @@ def runSimulation(**kwargs):
                      'position': scenario.p0,
                      'radarRange': scenario.radarRange,
                      'eta2': eta2,
+                     'eta2_ais': eta2_ais,
                      'N': N,
                      'P_d': P_d}
 
@@ -87,33 +74,20 @@ def runSimulation(**kwargs):
 
     def simulate(tracker, simList, scanList, minToc, maxToc, avgToc, **kwargs):
         print("#" * 100)
-        time.sleep(0.1)
+        time.sleep(0.01)
 
-        startIndex = 0
         if kwargs.get('preInitialized', False):
             tracker.preInitialize(simList)
-            startIndex = 1
 
-        for measurementList in scanList[startIndex:]:
+        for measurementList in scanList:
             tic = time.time()
             scanTime = measurementList.time
-            aisPredictions = aisList.getMeasurements(scanTime)
+            aisMeasurements = aisList.getMeasurements(scanTime)
 
             tracker.addMeasurementList(measurementList,
-                                       aisPredictions,
-                                       printTime=True,
-                                       printCluster=False,
-                                       dynamicWindow=False,
-                                       pruneSimilar=False,
+                                       aisMeasurements,
                                        **kwargs)
-            # print("CNLLR", ["{:.2f}".format(n.cumulativeNLLR) for n in tracker.__trackNodes__])
-            # print("CNLLR/n", ["{:.2}".format(n.score) for n in tracker.__trackNodes__])
-            # print("RootHeight", [n.rootHeight() for n in tracker.__trackNodes__])
-            # print("Node1", tracker.__trackNodes__[-1])
-            # print("Root", *[n.getRoot() for n in tracker.__trackNodes__ if n.ID == 16])
             toc = time.time() - tic
-            # print("H",tracker.__trackNodes__[7].measurementNumber,": ",tracker.__trackNodes__[7].cumulativeNLLR)
-            # print("TrackNode", tracker.__trackNodes__[7])
             minToc[0] = toc if toc < minToc[0] else minToc[0]
             maxToc[0] = toc if toc > maxToc[0] else maxToc[0]
             avgToc.append(toc)
@@ -176,7 +150,6 @@ def runSimulation(**kwargs):
         resultsPlotter.plotRuntime(path1)
 
     if kwargs.get('plot'):
-        import matplotlib.pyplot as plt
         import matplotlib.cm as cm
         import itertools
         colors1 = itertools.cycle(cm.rainbow(
@@ -192,11 +165,11 @@ def runSimulation(**kwargs):
         # tracker.plotValidationRegionFromTracks() # TODO: Does not work
         desiredPlotPeriod = scenario.radarPeriod
         markEvery = max(1, int(desiredPlotPeriod / scenario.simulationTimeStep))
-        hpf.plotTrueTrack(simList, colors=colors1, markevery=markEvery, label=False)
+        hpf.plotTrueTrack(simList, colors=colors1, markevery=markEvery, label=True)
         # tracker.plotMeasurementsFromRoot(dummy=False, real = False, includeHistory=False)
         # tracker.plotStatesFromRoot(dummy=False, real=False, ais=True)
         # tracker.plotMeasurementsFromTracks(labels = False, dummy = True, real = True)
-        # tracker.plotLastScan()
+        tracker.plotLastScan()
         # tracker.plotAllScans()
         # tracker.plotLastAisUpdate()
         # tracker.plotAllAisUpdates(stepsBack=N)
@@ -221,6 +194,13 @@ if __name__ == '__main__':
     import sys
     import os
 
+    logDir = os.path.join(os.getcwd(), 'logs')
+    if not os.path.exists(logDir): os.makedirs(logDir)
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s %(name)-25s %(levelname)-8s %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S',
+                        filename=os.path.join(logDir, 'myapp.log'),
+                        filemode='w')
     print(sys.version)
 
     parser = argparse.ArgumentParser(description="Run MHT tracker",
@@ -232,13 +212,19 @@ if __name__ == '__main__':
     print("Storing at", exportPath)
     runSimulation(plot=True,
                   profile=False,
-                  printInitialTargets=False,
+                  printInitialTargets=True,
                   printTargetList=False,
                   printScanList=False,
                   printAssociation=False,
                   printAISList=False,
                   checkIntegrity=False,
                   exportPath=exportPath,
-                  preInitialized=False,
+                  preInitialized=True,
+                  localClutter=True,
+                  dynamicWindow=False,
+                  printSimList=False,
+                  printTime=True,
+                  printCluster=False,
+                  pruneSimilar=False,
                   **args)
     print("-" * 100)
