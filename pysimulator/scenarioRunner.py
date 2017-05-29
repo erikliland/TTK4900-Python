@@ -131,7 +131,7 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
                      'N': N,
                      'P_d': P_d,
                      'localClutter':variationDict.get('localClutter', False),
-                     'lambda_local': variationDict.get('lambda_local',2),
+                     'lambda_local': variationDict.get('lambda_local',0),
                      'dynamicWindow': False}
     trackersettingsElement = variationElement.find(trackerSettingsTag)
     if trackersettingsElement is None:
