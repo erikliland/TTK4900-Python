@@ -2,6 +2,9 @@ from pysimulator.simulationConfig import (trackingFilePathList, initFilePathList
                                           lambdaphiList, nList, M_N_list, nMonteCarlo, baseSeed)
 import multiprocessing as mp
 from pysimulator import scenarioRunner
+import psutil
+import argparse
+import numpy as np
 
 
 def trackingWorker(scenarioIndex, pdList, lambdaphiList, nList, nMonteCarlo):
@@ -36,8 +39,9 @@ def initWorker(scenarioIndex, pdList, lambdaphiList, M_N_list, nMonteCarlo):
 
 
 def runScenariosMultiProcessing(trackingScenarioIndices, initScenarioIndices,
-                                pdList, lambdaphiList, nList, M_N_list, nMonteCarlo):
-    nProcesses = 5
+                                pdList, lambdaphiList, nList, M_N_list, nMonteCarlo, **kwargs):
+    nProcesses = kwargs.get('nProcesses', psutil.cpu_count(logical=False))
+    print("runScenariosMultiProcessing", kwargs)
     pool = mp.Pool(processes=nProcesses)
 
     results = []
@@ -83,8 +87,32 @@ def mainSingle():
 
 
 def mainMulti():
+    parser = argparse.ArgumentParser(description="Run MHT tracker simulations concurrent", argument_default=argparse.SUPPRESS)
+    # parser.add_argument('-F', help="Force run of files (if exist)", action='store_true')
+    # parser.add_argument('-D', help="Discard result", action='store_true')
+    # parser.add_argument('-f', help="File number to simulate", nargs='+', type=int)
+    parser.add_argument('-i', help="Number of simulations", type=int)
+    parser.add_argument('-c', help="Number of processes/cores to use", type=int)
+    # parser.add_argument('-b', help="Batch size for accumulate mode in x*nCores, default = 1", type=int)
+    # parser.add_argument('-C', help="Run compare and plot after finish", action='store_true')
+    args = vars(parser.parse_args())
+
+    kwargs = {}
+    if 'c' in args:
+        nCores = args.get('c')
+        assert np.isfinite(nCores)
+        assert type(nCores) is int
+        assert nCores > 0
+        kwargs['nProcesses'] = nCores
+    if 'i' in args:
+        nMonteCarloTemp = args.get('i')
+        assert np.isfinite(nMonteCarloTemp)
+        assert type(nMonteCarloTemp) is int
+        assert nMonteCarloTemp > 0
+        nMonteCarlo = nMonteCarloTemp
+
     runScenariosMultiProcessing(range(len(trackingFilePathList)), range(1),
-                                pdList, lambdaphiList, nList, M_N_list, nMonteCarlo)
+                                pdList, lambdaphiList, nList, M_N_list, nMonteCarlo, **kwargs)
 
 
 if __name__ == '__main__':
