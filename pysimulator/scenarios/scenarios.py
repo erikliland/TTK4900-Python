@@ -29,7 +29,7 @@ class ScenarioBase:
         # Expected number of measurements from new targets
         # per unit area of the measurement space
         self.lambda_nu = 2e-8
-        self.lambda_local = 1
+        self.lambda_local = 0
 
         assert self.simulationTimeStep <= self.radarPeriod
         assert self.simTime >= self.simulationTimeStep
