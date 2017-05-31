@@ -5,9 +5,11 @@ from pysimulator import scenarioRunner
 import psutil
 import argparse
 import numpy as np
+import logging
 
 
 def trackingWorker(scenarioIndex, pdList, lambdaphiList, nList, nMonteCarlo):
+    logging.disable(logging.CRITICAL)
     try:
         filePath = trackingFilePathList[scenarioIndex]
         print("Starting:", filePath, "Scenario index", scenarioIndex)
@@ -19,10 +21,12 @@ def trackingWorker(scenarioIndex, pdList, lambdaphiList, nList, nMonteCarlo):
                                                    nMonteCarlo,
                                                    baseSeed,
                                                    printLog=False)
+        print("Done:", filePath, "Scenario index", scenarioIndex)
     except Exception as e:
         print(e)
 
 def initWorker(scenarioIndex, pdList, lambdaphiList, M_N_list, nMonteCarlo):
+    logging.disable(logging.CRITICAL)
     try:
         filePath = initFilePathList[scenarioIndex]
         print("Starting:", filePath, "Scenario index", scenarioIndex)
@@ -40,7 +44,8 @@ def initWorker(scenarioIndex, pdList, lambdaphiList, M_N_list, nMonteCarlo):
 
 def runScenariosMultiProcessing(trackingScenarioIndices, initScenarioIndices,
                                 pdList, lambdaphiList, nList, M_N_list, nMonteCarlo, **kwargs):
-    nProcesses = kwargs.get('nProcesses', psutil.cpu_count(logical=False))
+    logging.disable(logging.CRITICAL)
+    nProcesses = kwargs.get('nProcesses', psutil.cpu_count(logical=True)-1)
     print("runScenariosMultiProcessing", kwargs)
     pool = mp.Pool(processes=nProcesses)
 
@@ -87,6 +92,8 @@ def mainSingle():
 
 
 def mainMulti():
+    logging.disable(logging.CRITICAL)
+
     parser = argparse.ArgumentParser(description="Run MHT tracker simulations concurrent", argument_default=argparse.SUPPRESS)
     # parser.add_argument('-F', help="Force run of files (if exist)", action='store_true')
     # parser.add_argument('-D', help="Discard result", action='store_true')
@@ -97,6 +104,7 @@ def mainMulti():
     # parser.add_argument('-C', help="Run compare and plot after finish", action='store_true')
     args = vars(parser.parse_args())
 
+    n = nMonteCarlo
     kwargs = {}
     if 'c' in args:
         nCores = args.get('c')
@@ -109,12 +117,14 @@ def mainMulti():
         assert np.isfinite(nMonteCarloTemp)
         assert type(nMonteCarloTemp) is int
         assert nMonteCarloTemp > 0
-        nMonteCarlo = nMonteCarloTemp
+        n = nMonteCarloTemp
+
 
     runScenariosMultiProcessing(range(len(trackingFilePathList)), range(1),
-                                pdList, lambdaphiList, nList, M_N_list, nMonteCarlo, **kwargs)
+                                pdList, lambdaphiList, nList, M_N_list, n, **kwargs)
 
 
 if __name__ == '__main__':
-    runScenariosMultiProcessing(range(len(trackingFilePathList)), range(1),
-                                pdList, lambdaphiList, nList, M_N_list, nMonteCarlo)
+    logging.disable(logging.CRITICAL)
+    runScenariosMultiProcessing(range(len(trackingFilePathList)), range(0),
+                                pdList, lambdaphiList, nList, M_N_list, 10)
