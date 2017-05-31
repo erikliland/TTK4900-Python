@@ -1,3 +1,4 @@
+import logging
 import pymht.tracker as tomht
 import pymht.utils.helpFunctions as hpf
 import xml.etree.ElementTree as ET
@@ -5,7 +6,6 @@ from pymht.utils.xmlDefinitions import *
 from pysimulator.scenarios.defaults import *
 import os
 import datetime
-
 
 def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nMonteCarlo,
                                 baseSeed, **kwargs):
@@ -167,7 +167,7 @@ def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed
 
 def runSimulation(variationElement, simList, scanList, aisList, trackerArgs,
                   trackerKwargs, preInitialized, **kwargs):
-
+    logging.disable(logging.CRITICAL)
     tracker = tomht.Tracker(*trackerArgs, **{**trackerKwargs, **kwargs})
 
     startIndex = 1 if preInitialized else 0
