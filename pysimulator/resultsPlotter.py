@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
-from mpl_toolkits.mplot3d import Axes3D
+# from mpl_toolkits.mplot3d import Axes3D
 import seaborn.apionly as sns
 import xml.etree.ElementTree as ET
 from pymht.utils.xmlDefinitions import *
@@ -22,6 +22,7 @@ halfPageHeight = 8.0 * 0.4 #inch
 linewidth = 1
 
 def exportInitialState():
+    print("exportInitialState")
     filePath = os.path.join(simulationConfig.path, 'plots', "Scenario_Initial_State.csv")
     with open(filePath, 'w') as csvfile:
         writer = csv.writer(csvfile)
@@ -33,6 +34,7 @@ def exportInitialState():
             writer.writerow(row)
 
 def exportAisState():
+    print("exportAisState")
     filePath = os.path.join(simulationConfig.path, 'plots', "Scenario_AIS_State.csv")
     with open(filePath, 'w') as csvfile:
         writer = csv.writer(csvfile)
@@ -52,22 +54,48 @@ def exportAisState():
             writer.writerow(row)
 
 def plotTrueTracks():
+    print("plotTrueTracks")
     import matplotlib.cm as cm
     import itertools
     import pymht.utils.helpFunctions as hpf
     scenario = scenarioList[0]
     colors1 = itertools.cycle(cm.rainbow(np.linspace(0, 1, len(scenario))))
     simList = scenario.getSimList()
-    figure = plt.figure(num=1, figsize=(9, 9), dpi=90)
-    hpf.plotTrueTrack(simList, colors=colors1, label=True, markevery=10)
-    hpf.plotRadarOutline(scenario.p0, scenario.radarRange, markCenter=False)
-    plt.xlabel("East [m]")
-    plt.ylabel("North [m]")
-    plt.title("True tracks", fontsize=titleFontsize)
-    plt.grid(True)
+    figure = plt.figure(figsize=(figureWidth, figureWidth), dpi=600)
+    sns.set_style(style='white')
+    ax = figure.gca()
+    hpf.plotTrueTrack(ax,simList, colors=colors1, label=True, markevery=15, fontsize=labelFontsize)
+    hpf.plotRadarOutline(ax,scenario.p0, scenario.radarRange, markCenter=False)
+    ax.set_xlabel("East [m]", fontsize=labelFontsize)
+    ax.set_ylabel("North [m]", fontsize=labelFontsize)
+    ax.set_title("True tracks", fontsize=titleFontsize)
+    ax.tick_params(labelsize=labelFontsize)
+    ax.grid(True)
     filePath = os.path.join(simulationConfig.path, 'plots', "ScenarioTruth.pdf")
-    plt.tight_layout()
+    figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
     figure.savefig(filePath)
+    figure.clf()
+    plt.close()
+
+def plotOverlaidRadarMeasurements():
+    print("plotOverlaidRadarMeasurements")
+    scenario = scenarioList[0]
+    simList = scenario.getSimList()
+    from .simulationConfig import lambdaphiList
+    nPlots = len(lambdaphiList)
+    figure = plt.figure(figsize=(figureWidth/(nPlots-1), fullPageHeight), dpi=1200)
+    for i, lambda_phi in enumerate(lambdaphiList):
+        scanList, _ = scenario.getSimulatedScenario(9895, simList, lambda_phi, 1.)
+        ax = figure.add_subplot(nPlots, 1, i+1)
+        scanList.plotFast(ax, alpha=0.4, markersize=1., markeredgewidth=0.)
+        ax.axis("equal")
+        ax.tick_params(axis='both', left='off', top='off', right='off',
+                        bottom='off', labelleft='off', labeltop='off',
+                        labelright='off', labelbottom='off')
+    filePath = os.path.join(simulationConfig.path, 'plots', "ScenarioOverlaid.pdf")
+    figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
+    figure.savefig(filePath)
+    figure.clf()
     plt.close()
 
 def plotTrackLoss(loadFilePath):
@@ -165,8 +193,9 @@ def plotRuntime(loadFilePath):
     variationsElement = scenarioElement.find(
         '.{0:}[@{1:}="{2:}"]'.format(variationsTag, preinitializedTag, True))
     runtimeLog = _getRuntimePlotData(variationsElement, percentile=10.)
+    radarPeriod = float(scenarioSettingsElement.find("radarPeriod").text)
     # print("runtimeLog", *[str(k)+str(v) for k,v in runtimeLog.items()], sep="\n")
-    figure = _plotTimeLog(runtimeLog)
+    figure = _plotTimeLog(runtimeLog, radarPeriod)
     figure.savefig(savePath)
     plt.close()
 
@@ -371,7 +400,8 @@ def _plotTrackLossPercentage(plotData):
                 label = "$P_D$={0:}, N={1:.0f}".format(P_d, N),
                 c = colors[len(nSet)-1],
                 linestyle=linestyleList[len(pdSet)-1],
-                linewidth = linewidth)
+                linewidth = linewidth,
+                marker='*' if len(x) == 1 else None)
     lambdaPhiList = list(lambdaPhiSet)
     lambdaPhiList.sort()
 
@@ -379,11 +409,12 @@ def _plotTrackLossPercentage(plotData):
     ax.set_xlabel("$\lambda_{\phi}$", fontsize=labelFontsize)
     ax.set_ylabel("Track loss (%)", fontsize=labelFontsize)
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
-    ax.set_ylim(0, 30)
+    ax.set_ylim(-1, 100.0)
     ax.tick_params(labelsize=labelFontsize)
     yStart, yEnd = ax.get_ylim()
-    ax.yaxis.set_ticks(np.arange(yStart, yEnd * 1.01, 10))
+    ax.yaxis.set_ticks(np.arange(0., yEnd * 1.01, 10))
     ax.xaxis.set_ticks(lambdaPhiList)
+    sns.despine(ax=ax, offset=0)
     figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
     return figure
 
@@ -410,8 +441,8 @@ def _plotTrackingPercentage(plotData):
             x, y = (list(t) for t in zip(*sorted(zip(x, y))))
             trackingPercentageList.append((P_d, N, x, y))
 
-    trackingPercentageList.sort(key=lambda tup: float(tup[1]), reverse=True)
-    trackingPercentageList.sort(key=lambda tup: float(tup[0]), reverse=True)
+    trackingPercentageList.sort(key=lambda tup: float(tup[1]), reverse=False)
+    trackingPercentageList.sort(key=lambda tup: float(tup[0]), reverse=False)
 
     pdSet = set()
     nSet = set()
@@ -420,6 +451,7 @@ def _plotTrackingPercentage(plotData):
             nSet.clear()
         pdSet.add(P_d)
         nSet.add(N)
+        minTracking = min(minTracking, np.min(y))
         ax.plot(x, y,
                 label="$P_D$={0:}, N={1:.0f}".format(P_d, N),
                 c=colors[len(nSet) - 1],
@@ -432,9 +464,9 @@ def _plotTrackingPercentage(plotData):
 
     ax.legend(loc=0, ncol=len(pdSet), fontsize=legendFontsize)
     ax.set_xlabel("$\lambda_{\phi}$", fontsize=labelFontsize)
-    ax.set_ylabel("\nAverage tracking percentage", fontsize=labelFontsize)
+    ax.set_ylabel("Average tracking percentage", fontsize=labelFontsize)
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
-    ax.set_ylim(0.0, 100.01)
+    ax.set_ylim(min(30.0, minTracking), 100.01)
     ax.tick_params(labelsize=labelFontsize)
     sns.despine(ax=ax, offset=0)
     ax.xaxis.set_ticks(lambdaPhiList)
@@ -564,7 +596,7 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
 def _plotTrackingCorrectness(plotData):
     return plt.figure()
 
-def _plotTimeLog(plotData):
+def _plotTimeLog(plotData, radarPeriod=None):
     figure = plt.figure(figsize=(figureWidth, halfPageHeight), dpi=600)
     ax = figure.gca()
     sns.set_style(style='white')
@@ -586,16 +618,19 @@ def _plotTimeLog(plotData):
             ax.plot(x,y, linestyle=linestyleList[i], color=colors[j],
                      label="$P_D$={0:}, $\lambda_\phi$={1:}".format(P_d, lambda_phi),
                     linewidth=linewidth)
+    if radarPeriod is not None:
+        ax.plot([min(nSet), max(nSet)],[radarPeriod, radarPeriod],
+                color='black', linestyle='--', linewidth=1, alpha=0.7)
 
     ax.set_xlim(ax.get_xlim()[0]-0.5, ax.get_xlim()[1]+0.5)
-    ax.set_ylim(0,1)
+    ax.set_ylim(0.0,5.0)
     ax.set_title("Tracking iteration runtime", fontsize=titleFontsize)
     ax.set_xlabel("N", fontsize=labelFontsize, labelpad=0)
     ax.set_ylabel("Average iteration time [s]", fontsize=labelFontsize)
     ax.xaxis.set_ticks(sorted(list(nSet)))
     ax.tick_params(labelsize=labelFontsize)
 
-    ax.legend(loc=0, fontsize=legendFontsize)
+    ax.legend(loc=2, fontsize=legendFontsize, ncol=3)
     ax.grid(False)
 
     sns.despine(ax=ax)
