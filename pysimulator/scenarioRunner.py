@@ -109,7 +109,6 @@ def _renameOldFiles(path):
         newPath = os.path.join(head, filename + "_" + timeString + extension)
         os.rename(path, newPath)
 
-
 def runMonteCarloSimulations(variationElement, scenario, simList, nSim, baseSeed,
                              variationDict, preInitialized, **kwargs):
     changes = False
@@ -177,10 +176,8 @@ def runSimulation(variationElement, simList, scanList, aisList, trackerArgs,
     for measurementList in scanList[startIndex:]:
         scanTime = measurementList.time
         aisPredictions = aisList.getMeasurements(scanTime)
-        tracker.addMeasurementList(measurementList, aisPredictions, pruneSimilar=not preInitialized)
+        tracker.addMeasurementList(measurementList, aisPredictions)
     tracker._storeRun(variationElement, preInitialized, **kwargs)
-
-
 
 def storeTrackerData(variationElement, trackerArgs, trackerKwargs):
     trackersettingsElement = ET.SubElement(variationElement, trackerSettingsTag)
