@@ -3,9 +3,10 @@ import multiprocessing as mp
 
 
 def plotResults(filePathList, initFilePathList):
-    resultsPlotter.plotTrueTracks()
     resultsPlotter.exportInitialState()
     resultsPlotter.exportAisState()
+    resultsPlotter.plotOverlaidRadarMeasurements()
+    resultsPlotter.plotTrueTracks()
     with mp.Pool() as pool:
         pool.map(resultsPlotter.plotInitializationTime, initFilePathList)
         pool.map(resultsPlotter.plotTrackLoss, filePathList)
@@ -14,4 +15,4 @@ def plotResults(filePathList, initFilePathList):
 
 if __name__ == '__main__':
     from pysimulator.simulationConfig import trackingFilePathList, initFilePathList
-    plotResults(trackingFilePathList, initFilePathList[0:1])
+    plotResults(trackingFilePathList, initFilePathList)
