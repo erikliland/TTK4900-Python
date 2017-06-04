@@ -45,6 +45,14 @@ class ScenarioBase:
         for k, v in vars(self).items():
             ET.SubElement(scenariosettingsElement, str(k)).text = str(v)
 
+    def plotRadarOutline(self, ax, **kwargs):
+        from matplotlib.patches import Ellipse
+        if kwargs.get("markCenter", True):
+            ax.plot(self.p0[0], self.p0[0], "bo")
+        circle = Ellipse((self.p0[0], self.p0[1]), self.radarRange * 2, self.radarRange * 2,
+                         edgecolor="black", linestyle="dotted", facecolor="none")
+        ax.add_artist(circle)
+
 
 class Scenario(ScenarioBase):
 
