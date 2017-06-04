@@ -1,3 +1,7 @@
+# import matplotlib
+# matplotlib.use("Agg")
+import matplotlib.cm as cm
+import itertools
 import logging
 import numpy as np
 import time
@@ -21,12 +25,14 @@ def runSimulation(**kwargs):
 
     i=4
     seed = simulationConfig.baseSeed + i - 1
-    simTime = scenario.radarPeriod * 6  # sec
-    lambda_phi = 2e-5
-    P_d = 0.6 # Probability of detection
-    N = 6  # Number of  timesteps to tail (N-scan)
+    simTime = scenario.radarPeriod * 60  # sec
+    lambda_phi = 5e-6
+    P_d = 0.5 # Probability of detection
+    N = 3  # Number of  timesteps to tail (N-scan)
     M_required = 2
-    N_checks = 3
+    N_checks = 4
+    desiredPlotPeriod = scenario.radarPeriod
+    markEvery = max(1, int(desiredPlotPeriod / scenario.simulationTimeStep))
     preInitialized = kwargs.get('preInitialized',False)
 
     if kwargs.get('printInitialTargets', False):
@@ -70,6 +76,14 @@ def runSimulation(**kwargs):
     if kwargs.get('printAISList', False):
         aisList.print()
 
+    if kwargs.get('storeMovie', False):
+        import matplotlib.animation as animation
+        metadata = dict(title='Movie Test', artist='Matplotlib',
+                        comment='Movie support!')
+        fileWriter = animation.FFMpegWriter(fps=2, metadata=metadata, bitrate=1800)
+        fig = plt.figure()
+        ax = fig.gca()
+        fileWriter.setup(fig, "writer_test.mp4", 100)
     tic1 = time.time()
 
     def simulate(tracker, simList, scanList, minToc, maxToc, avgToc, **kwargs):
@@ -91,6 +105,31 @@ def runSimulation(**kwargs):
             minToc[0] = toc if toc < minToc[0] else minToc[0]
             maxToc[0] = toc if toc > maxToc[0] else maxToc[0]
             avgToc.append(toc)
+
+            if kwargs.get('storeMovie', False):
+                ax.clear()
+                colors1 = itertools.cycle(cm.rainbow(np.linspace(0, 1, len(scenario))))
+                colors2 = itertools.cycle(cm.rainbow(np.linspace(0, 1, len(tracker.__targetList__))))
+                colors3 = itertools.cycle(cm.rainbow(np.linspace(0, 1, len(tracker.__targetList__))))
+                scenario.plotRadarOutline(ax, markCenter=False)
+                simList.plot(ax,colors=colors1, markevery=markEvery, label=False)
+                tracker.plotLastScan(ax)
+                tracker.plotLastAisUpdate(ax)
+                tracker.plotHypothesesTrack(ax, colors=colors3, markStates=False)  # CAN BE SLOW!
+                tracker.plotActiveTracks(ax,colors=colors2, markInitial=True, labelInitial=True, markRoot=False,
+                                         markEnd=False,markStates=False, real=True, dummy=True, ais=True,
+                                         smooth=False, markID=False)
+                tracker.plotTerminatedTracks(ax,markStates=False, real=True, dummy=True, ais=True, markInitial=False,
+                                             markID=False)
+                ax.axis("equal")
+                # ax.set_xlim((scenario.p0[0] - scenario.radarRange * 1.05,
+                #              scenario.p0[0] + scenario.radarRange * 1.05))
+                # ax.set_ylim((scenario.p0[1] - scenario.radarRange * 1.05,
+                #              scenario.p0[1] + scenario.radarRange * 1.05))
+                ax.set_xlim(-4100, -2500)
+                ax.set_ylim(-500,500)
+                fileWriter.grab_frame()
+
         print("#" * 100)
 
     if kwargs.get('profile', False):
@@ -106,6 +145,9 @@ def runSimulation(**kwargs):
         p.strip_dirs().sort_stats('cumulative').print_stats(20)
     else:
         simulate(tracker, simList, scanList, minToc, maxToc, avgToc, **kwargs)
+
+    if kwargs.get('storeMovie', False):
+        fileWriter.finish()
 
     if kwargs.get('printTargetList', False):
         tracker.printTargetList()
@@ -146,39 +188,35 @@ def runSimulation(**kwargs):
 
         from pysimulator import resultsPlotter
         resultsPlotter.plotTrackingPercentage(path1)
+        resultsPlotter.plotTrackLoss(path1)
         resultsPlotter.plotInitializationTime(path2)
         resultsPlotter.plotRuntime(path1)
 
     if kwargs.get('plot'):
-        import matplotlib.cm as cm
-        import itertools
-        colors1 = itertools.cycle(cm.rainbow(
-            np.linspace(0, 1, len(scenario))))
-        colors2 = itertools.cycle(cm.rainbow(
-            np.linspace(0, 1, len(tracker.__targetList__))))
-        colors3 = itertools.cycle(cm.rainbow(
-            np.linspace(0, 1, len(tracker.__targetList__))))
-        fig1 = plt.figure(num=1, figsize=(9, 9), dpi=90)
-        hpf.plotRadarOutline(scenario.p0, scenario.radarRange, markCenter=False)
+        plt.cla()
+        plt.clf()
+        plt.close()
+        colors1 = itertools.cycle(cm.rainbow(np.linspace(0, 1, len(scenario))))
+        colors2 = itertools.cycle(cm.rainbow(np.linspace(0, 1, len(tracker.__targetList__))))
+        colors3 = itertools.cycle(cm.rainbow(np.linspace(0, 1, len(tracker.__targetList__))))
+        fig1 = plt.figure(figsize=(9, 9), dpi=100)
+        ax = fig1.gca()
+        scenario.plotRadarOutline(ax, markCenter=False)
         # tracker.plotInitialTargets()
-        # tracker.plotVelocityArrowForTrack() # TODO: Does not work
-        # tracker.plotValidationRegionFromTracks() # TODO: Does not work
-        desiredPlotPeriod = scenario.radarPeriod
-        markEvery = max(1, int(desiredPlotPeriod / scenario.simulationTimeStep))
-        hpf.plotTrueTrack(simList, colors=colors1, markevery=markEvery, label=True)
+        simList.plot(ax,colors=colors1, markevery=markEvery, label=True)
         # tracker.plotMeasurementsFromRoot(dummy=False, real = False, includeHistory=False)
         # tracker.plotStatesFromRoot(dummy=False, real=False, ais=True)
         # tracker.plotMeasurementsFromTracks(labels = False, dummy = True, real = True)
-        tracker.plotLastScan()
+        # tracker.plotLastScan(ax)
         # tracker.plotAllScans()
         # tracker.plotLastAisUpdate()
-        # tracker.plotAllAisUpdates(stepsBack=N)
+        # tracker.plotAllAisUpdates()
         # tracker.plotHypothesesTrack(colors=colors3, markStates=True)  # CAN BE SLOW!
-        tracker.plotActiveTracks(colors=colors2, markInitial=True, labelInitial=True, markRoot=False,
-                                 markStates=True, real=True, dummy=True, ais=True, smooth=False)
+        tracker.plotActiveTracks(ax, colors=colors2, markInitial=True, labelInitial=True, markRoot=False, markEnd=False,
+                                 markStates=False, real=True, dummy=True, ais=True, smooth=False, markID=False)
         # tracker.plotActiveTracks(colors=colors2, markInitial=False, markRoot=False, markStates=False, real=False,
         #                          dummy=False, ais=False, smooth=True, markEnd=False)
-        tracker.plotTerminatedTracks(markStates=True, real=True, dummy=True, ais=True, markInitial=True)
+        tracker.plotTerminatedTracks(ax, markStates=False, real=True, dummy=True, ais=True, markInitial=True, markID=False)
 
         plt.axis("equal")
         plt.xlim((scenario.p0[0] - scenario.radarRange * 1.05,
@@ -196,7 +234,7 @@ if __name__ == '__main__':
 
     logDir = os.path.join(os.getcwd(), 'logs')
     if not os.path.exists(logDir): os.makedirs(logDir)
-    logging.basicConfig(level=logging.INFO,
+    logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s %(name)-25s %(levelname)-8s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S',
                         filename=os.path.join(logDir, 'myapp.log'),
@@ -212,7 +250,7 @@ if __name__ == '__main__':
     print("Storing at", exportPath)
     runSimulation(plot=True,
                   profile=False,
-                  printInitialTargets=True,
+                  printInitialTargets=False,
                   printTargetList=False,
                   printScanList=False,
                   printAssociation=False,
@@ -220,11 +258,13 @@ if __name__ == '__main__':
                   checkIntegrity=False,
                   exportPath=exportPath,
                   preInitialized=True,
-                  localClutter=True,
+                  localClutter=False,
                   dynamicWindow=False,
                   printSimList=False,
                   printTime=True,
                   printCluster=False,
                   pruneSimilar=False,
+                  aisInitialization=True,
+                  storeMovie=False,
                   **args)
     print("-" * 100)
