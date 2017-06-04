@@ -100,6 +100,7 @@ def mainMulti():
     # parser.add_argument('-f', help="File number to simulate", nargs='+', type=int)
     parser.add_argument('-i', help="Number of simulations", type=int)
     parser.add_argument('-c', help="Number of processes/cores to use", type=int)
+    parser.add_argument('-z', help="Compress (zip) the zml file when done", action='store_true')
     # parser.add_argument('-b', help="Batch size for accumulate mode in x*nCores, default = 1", type=int)
     # parser.add_argument('-C', help="Run compare and plot after finish", action='store_true')
     args = vars(parser.parse_args())
@@ -118,9 +119,11 @@ def mainMulti():
         assert type(nMonteCarloTemp) is int
         assert nMonteCarloTemp > 0
         n = nMonteCarloTemp
+    if 'z' in args:
+        kwargs['zip'] = True
 
 
-    runScenariosMultiProcessing(range(len(trackingFilePathList)), range(1),
+    runScenariosMultiProcessing(range(len(trackingFilePathList)), range(0),
                                 pdList, lambdaphiList, nList, M_N_list, n, **kwargs)
 
 
