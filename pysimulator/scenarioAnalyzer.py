@@ -3,6 +3,7 @@ from pymht.utils.xmlDefinitions import *
 from pysimulator.simulationConfig import *
 from pymht.initiators.m_of_n import _solve_global_nearest_neighbour
 import numpy as np
+import math
 
 def analyzeTrackingFile(filePath):
     if filePath is None: return
@@ -15,17 +16,22 @@ def analyzeTrackingFile(filePath):
         return
     scenarioElement = tree.getroot()
     groundtruthElement = scenarioElement.find(groundtruthTag)
-    # scenariosettingsElement = scenarioElement.find(scenariosettingsTag)
+    scenariosettingsElement = scenarioElement.find(scenariosettingsTag)
     variationsList = scenarioElement.findall(variationsTag)
     # print("Scenario name:", scenariosettingsElement.find(nameTag).text)
     groundtruthList = groundtruthElement.findall(trackTag)
+
+    initTime = float(scenariosettingsElement.find("initTime").text)
+    radarPeriod = float(scenariosettingsElement.find("radarPeriod").text)
+    nScans = float(scenariosettingsElement.find("nScans").text)
+    lastScanTime = initTime + (radarPeriod * nScans)
 
     for variationsElement in variationsList:
         if variationsElement.get(preinitializedTag) != "True":
             print("Deleting", variationsElement.attrib)
             scenarioElement.remove(variationsElement)
             continue
-        analyzeVariationsTrackingPerformance(groundtruthList, variationsElement, acceptThreshold)
+        analyzeVariationsTrackingPerformance(groundtruthList, variationsElement, acceptThreshold, lastScanTime)
     tree.write(filePath)
     print("Done:", filePath)
 
@@ -53,21 +59,21 @@ def analyzeInitFile(filePath):
     tree.write(filePath)
     print("Done:", filePath)
 
-def analyzeVariationsTrackingPerformance(groundtruthList, variationsElement, threshold):
+def analyzeVariationsTrackingPerformance(groundtruthList, variationsElement, threshold, lastScanTime):
     variationList = variationsElement.findall(variationTag)
     for variation in variationList:
-        analyzeVariationTrackLossPerformance(groundtruthList, variation, threshold)
+        analyzeVariationTrackLossPerformance(groundtruthList, variation, threshold, lastScanTime)
 
 def analyzeVariationsInitializationPerformance(groundtruthList, variationsElement, threshold):
     variationList = variationsElement.findall(variationTag)
     for variation in variationList:
         analyzeVariationInitializationPerformance(groundtruthList, variation, threshold)
 
-def analyzeVariationTrackLossPerformance(groundtruthList, variation, threshold):
+def analyzeVariationTrackLossPerformance(groundtruthList, variation, threshold, lastScanTime):
     runList = variation.findall(runTag)
     for run in runList:
         estimateTrackList = run.findall(trackTag)
-        matchList = _matchTrueWithEstimatedTracks(groundtruthList, estimateTrackList, threshold)
+        matchList = _matchTrueWithEstimatedTracks(groundtruthList, estimateTrackList, threshold, lastScanTime)
         _storeMatchList(run, matchList)
 
 def analyzeVariationInitializationPerformance(groundtruthList, variation, threshold):
@@ -76,9 +82,12 @@ def analyzeVariationInitializationPerformance(groundtruthList, variation, thresh
         for initiationLogElement in runElement.findall(initializationLogTag):
             runElement.remove(initiationLogElement)
         initiationLog, falseInitiationLog = _matchAndTimeInitialTracks(groundtruthList, runElement, threshold)
+        # print("initiationLog",initiationLog)
+        # print("falseInitiationLog",falseInitiationLog)
+        # steadyStateErroneousTracks = _steadyState(falseInitiationLog)
         _storeInitializationLog(runElement, initiationLog, falseInitiationLog)
 
-def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
+def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold, lastScanTime):
     resultList = []
     for trueTrack in truetrackList:
         trueTrackStatesElement = trueTrack.find(statesTag)
@@ -93,10 +102,10 @@ def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold):
             smoothedEstimatedStateList = smoothedEstimatedTrackStatesElement.findall(stateTag)
 
             timeMatch, goodTimeMatch, rmsError, lostTrack = _compareTrackList(
-                trueTrackStateList,estimatedStateList,threshold)
+                trueTrackStateList,estimatedStateList,threshold, lastScanTime)
 
             _, _, smoothedRmsError, _ = _compareTrackList(
-                trueTrackStateList, smoothedEstimatedStateList, threshold)
+                trueTrackStateList, smoothedEstimatedStateList, threshold, lastScanTime)
             timeMatchLength = len(timeMatch)
             goodTimeMatchLength = len(goodTimeMatch)
 
@@ -201,7 +210,7 @@ def _matchAndTimeInitialTracks(groundtruthList, runElement, threshold):
 
     return initiationLog, falseInitiationLog
 
-def _compareTrackList(trueTrackStateList, estimatedStateList, threshold):
+def _compareTrackList(trueTrackStateList, estimatedStateList, threshold, lastScanTime):
     timeMatch = _timeMatch(trueTrackStateList, estimatedStateList)
 
     trueTrackSlice = [s
@@ -215,14 +224,14 @@ def _compareTrackList(trueTrackStateList, estimatedStateList, threshold):
     assert len(timeMatch) == len(trueTrackSlice) == len(estimatedTrackSlice)
 
     goodTimeMatch, rmsError, lostTrack = _compareTrackSlices(
-        timeMatch,trueTrackSlice,estimatedTrackSlice,threshold)
+        timeMatch,trueTrackSlice,estimatedTrackSlice,threshold, lastScanTime)
 
     if lostTrack is not None:
         return (timeMatch, goodTimeMatch, rmsError, lostTrack)
 
     return ([],[],np.nan, None)
 
-def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshold):
+def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshold, lastScanTime):
     assert len(trueTrackSlice) == len(estimatedTrackSlice)
     deltaList = []
     for trueState, estimatedState in zip(trueTrackSlice, estimatedTrackSlice):
@@ -241,10 +250,16 @@ def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshol
                 # print("Does not converge back")
                 break
             goodIndices = [i for i, d in enumerate(deltaList[i + 1:]) if d < threshold]
-            if len(goodIndices) <= 1:
-                # print("Convergence is only at one time step")
-                break
-            elif any([d > (threshold * 2) for d in deltaList[i + 1:]]):
+            assert len(goodIndices) > 0
+            if len(goodIndices) == 1:
+                # print("Convergence is only at one time step", goodIndices)
+                lastGoodTime = timeMatch[i+1+goodIndices[-1]]
+                if math.isclose(float(lastGoodTime), float(lastScanTime)):
+                    # print("Saved by the lastScan rule...")
+                    pass
+                else:
+                    break
+            elif any([d > (threshold * 10) for d in deltaList[i + 1:]]):
                 # print("Future exceeds threshold*2")
                 break
 
@@ -346,3 +361,8 @@ def _multiplePossibleMatches(resultList):
         sortedDuplicates = sorted(duplicateTuples, key=lambda tup: tup[1])
         for e in sortedDuplicates[1:]:
             resultList.remove(e[0])
+
+def _steadyState(falseInitiationLog):
+    nErroneousTracksAlive = 3
+    steadyStateErroneousTracks = 4
+    return steadyStateErroneousTracks
