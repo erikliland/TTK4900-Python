@@ -8,6 +8,7 @@ from pymht.utils.xmlDefinitions import *
 import os
 import numpy as np
 import csv
+import math
 import ast
 from pysimulator import simulationConfig
 from pysimulator.scenarios.scenarios import scenarioList
@@ -177,8 +178,11 @@ def plotTrackLoss(loadFilePath):
         print(e)
         return
     scenarioElement = tree.getroot()
+    scenarioSettingsElement = scenarioElement.find(scenariosettingsTag)
     groundtruthElement = scenarioElement.find(groundtruthTag)
     variationsElement = scenarioElement.findall('.Variations[@preinitialized="True"]')[0]
+    initTime = float(scenarioSettingsElement.find("initTime").text)
+    assert np.isfinite(initTime)
     plotData = _getTrackLossPlotData(groundtruthElement, variationsElement)
     figure = _plotTrackLossPercentage(plotData)
     figure.savefig(savePath)
@@ -285,7 +289,8 @@ def _getTrackLossPlotData(groundtruthElement, variationsElement):
             trackList = run.findall(trackTag)
             trackLossList = np.array([t.get(losttrackTag)
                                       for t in trackList
-                                      if t.get(matchidTag) in trueIdList])
+                                      if ((t.get(matchidTag) in trueIdList) and
+                                          (t.get(matchidTag) == t.get(idTag)))])
             trackLossList =  trackLossList == str(True)
             trackLossPercentageList.append((np.sum(trackLossList)/len(trackLossList))*100)
 
@@ -545,7 +550,8 @@ def _plotTrackingPercentage(plotData):
     return figure
 
 def _plotInitializationPerformance(plotData, loadFilePath, timeArray, threshold):
-    bigM = 1000
+    bigM = 900
+    normalizationConstant = 18.2
     savePath = _getSavePath(loadFilePath, "Performance")
     mSet = set()
     nSet = set()
@@ -575,15 +581,18 @@ def _plotInitializationPerformance(plotData, loadFilePath, timeArray, threshold)
     for M, N, cost in resultList:
         mIndex = mList.index(M)
         nIndex = nList.index(N)
-        plotArray[mIndex][nIndex] = np.sqrt(cost)
-
+        costNormalized = np.sqrt(cost)/ normalizationConstant
+        assert costNormalized <= 1., "New normalization = {:}".format(costNormalized*normalizationConstant)
+        plotArray[mIndex][nIndex] = costNormalized
+    print("max cost", np.nanmax(plotArray))
     figure = plt.figure(figsize=(figureWidth, fullPageHeight/3), dpi=dpi)
     ax = figure.gca()
     cax = ax.matshow(plotArray)
-    cax.set_clim(0,25.)
+    cax.set_clim(0,1)
     cax.set_cmap(cm.jet)
     colorbar = figure.colorbar(cax)
     colorbar.ax.tick_params(labelsize=labelFontsize)
+    colorbar.ax.invert_yaxis()
     ax.set_xlabel("N", fontsize=labelFontsize)
     ax.set_ylabel("M", fontsize=labelFontsize)
     ax.set_xticklabels(['']+nList)
