@@ -9,4 +9,4 @@ def analyseResults(filePathList=[], initFilePathList = []):
 
 if __name__ == '__main__':
     from pysimulator.simulationConfig import trackingFilePathList, initFilePathList
-    analyseResults(trackingFilePathList, initFilePathList[0:1])
+    analyseResults(trackingFilePathList, initFilePathList)
