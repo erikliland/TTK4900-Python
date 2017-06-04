@@ -1,5 +1,8 @@
-# import matplotlib
-# matplotlib.use("Agg")
+import matplotlib
+backend = matplotlib.get_backend()
+print("backend", backend)
+matplotlib.use(backend)
+import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import itertools
 import logging
@@ -7,7 +10,6 @@ import numpy as np
 import time
 import pymht.tracker as tomht
 import pymht.utils.helpFunctions as hpf
-import matplotlib.pyplot as plt
 from pysimulator import simulationConfig
 from pysimulator.scenarios.defaults import *
 import xml.etree.ElementTree as ET
@@ -224,6 +226,7 @@ def runSimulation(**kwargs):
         plt.ylim((scenario.p0[1] - scenario.radarRange * 1.05,
                   scenario.p0[1] + scenario.radarRange * 1.05))
         fig1.canvas.draw()
+        print("backend",matplotlib.get_backend())
         plt.show()
 
 
