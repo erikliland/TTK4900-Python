@@ -52,6 +52,8 @@ def runPreinitializedVariations(scenario, path, pdList, lambdaphiList, nList, nM
     if changes:
         _renameOldFiles(path)
         hpf.writeElementToFile(path, scenarioElement)
+        if kwargs.get('compress',True):
+            _compressFile(path)
 
 def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list, nMonteCarlo,
                                 baseSeed, **kwargs):
@@ -99,6 +101,8 @@ def runInitializationVariations(scenario, path, pdList, lambdaphiList, M_N_list,
     if changes:
         _renameOldFiles(path)
         hpf.writeElementToFile(path, scenarioElement)
+        if kwargs.get('compress',True):
+            _compressFile(path)
 
 def _renameOldFiles(path):
     if os.path.exists(path):
@@ -185,3 +189,17 @@ def storeTrackerData(variationElement, trackerArgs, trackerKwargs):
         ET.SubElement(trackersettingsElement, str(k)).text = str(v)
     ET.SubElement(trackersettingsElement, "lambda_phi").text = str(trackerArgs[2])
     ET.SubElement(trackersettingsElement, "lambda_nu").text = str(trackerArgs[3])
+
+def _compressFile(path):
+    import zipfile
+    zipPath = os.path.splitext(path)[0] + '.zip'
+    try:
+        import zlib
+        compression = zipfile.ZIP_DEFLATED
+    except:
+        compression = zipfile.ZIP_STORED
+    zf = zipfile.ZipFile(zipPath, mode='w')
+    try:
+        zf.write(path, compress_type=compression, arcname=os.path.basename(path))
+    finally:
+        zf.close()
