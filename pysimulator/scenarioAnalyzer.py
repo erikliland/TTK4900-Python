@@ -104,8 +104,6 @@ def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold, l
 
             timeMatch, goodTimeMatch, rmsError, lostTrack = _compareTrackList(
                 trueTrackStateList,estimatedStateList,threshold, lastTrackTime, trackLength)
-            if not lostTrack:
-                print("trueTrackID", trueTrackID)
             _, _, smoothedRmsError, _ = _compareTrackList(
                 trueTrackStateList, smoothedEstimatedStateList, threshold, lastTrackTime, trackLength)
             timeMatchLength = len(timeMatch)
