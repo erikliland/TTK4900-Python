@@ -94,6 +94,7 @@ def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold, l
         trueTrackStateList = trueTrackStatesElement.findall(stateTag)
         trueTrackID = trueTrack.get(idTag)
         trackLength = len(trueTrackStateList)
+        lastTrackTime = float(trueTrackStateList[-1].get(timeTag))
         for estimatedTrack in estimateTrackList:
             estimatedTrackID = estimatedTrack.get(idTag)
             estimatedTrackStatesElement = estimatedTrack.find(statesTag)
@@ -102,10 +103,11 @@ def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold, l
             smoothedEstimatedStateList = smoothedEstimatedTrackStatesElement.findall(stateTag)
 
             timeMatch, goodTimeMatch, rmsError, lostTrack = _compareTrackList(
-                trueTrackStateList,estimatedStateList,threshold, lastScanTime)
-
+                trueTrackStateList,estimatedStateList,threshold, lastTrackTime, trackLength)
+            if not lostTrack:
+                print("trueTrackID", trueTrackID)
             _, _, smoothedRmsError, _ = _compareTrackList(
-                trueTrackStateList, smoothedEstimatedStateList, threshold, lastScanTime)
+                trueTrackStateList, smoothedEstimatedStateList, threshold, lastTrackTime, trackLength)
             timeMatchLength = len(timeMatch)
             goodTimeMatchLength = len(goodTimeMatch)
 
@@ -210,7 +212,7 @@ def _matchAndTimeInitialTracks(groundtruthList, runElement, threshold):
 
     return initiationLog, falseInitiationLog
 
-def _compareTrackList(trueTrackStateList, estimatedStateList, threshold, lastScanTime):
+def _compareTrackList(trueTrackStateList, estimatedStateList, threshold, lastScanTime, trackLength):
     timeMatch = _timeMatch(trueTrackStateList, estimatedStateList)
 
     trueTrackSlice = [s
@@ -224,14 +226,14 @@ def _compareTrackList(trueTrackStateList, estimatedStateList, threshold, lastSca
     assert len(timeMatch) == len(trueTrackSlice) == len(estimatedTrackSlice)
 
     goodTimeMatch, rmsError, lostTrack = _compareTrackSlices(
-        timeMatch,trueTrackSlice,estimatedTrackSlice,threshold, lastScanTime)
+        timeMatch,trueTrackSlice,estimatedTrackSlice,threshold, lastScanTime, trackLength)
 
     if lostTrack is not None:
         return (timeMatch, goodTimeMatch, rmsError, lostTrack)
 
     return ([],[],np.nan, None)
 
-def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshold, lastScanTime):
+def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshold, lastScanTime, trackLength):
     assert len(trueTrackSlice) == len(estimatedTrackSlice)
     deltaList = []
     for trueState, estimatedState in zip(trueTrackSlice, estimatedTrackSlice):
@@ -245,22 +247,17 @@ def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshol
     delta2List = []
     for i, (time, delta) in enumerate(zip(timeMatch, deltaList)):
         if delta > threshold:
-            # print("Exceeded threshold")
             if not any([d < threshold for d in deltaList[i+1:]]):
-                # print("Does not converge back")
                 break
             goodIndices = [i for i, d in enumerate(deltaList[i + 1:]) if d < threshold]
             assert len(goodIndices) > 0
             if len(goodIndices) == 1:
-                # print("Convergence is only at one time step", goodIndices)
                 lastGoodTime = timeMatch[i+1+goodIndices[-1]]
                 if math.isclose(float(lastGoodTime), float(lastScanTime)):
-                    # print("Saved by the lastScan rule...")
                     pass
                 else:
                     break
             elif any([d > (threshold * 10) for d in deltaList[i + 1:]]):
-                # print("Future exceeds threshold*2")
                 break
 
         goodTimeMatch.append(time)
@@ -272,7 +269,9 @@ def _compareTrackSlices(timeMatch, trueTrackSlice, estimatedTrackSlice, threshol
 
     if (len(goodTimeMatch) > 0) and not np.isnan(meanSquaredError):
         rmsError = np.sqrt(meanSquaredError)
-        lostTrack = goodTimeMatch < timeMatch
+        lostTrack = ((goodTimeMatch < timeMatch) or
+                     (not math.isclose(float(goodTimeMatch[-1]), float(lastScanTime))) or
+                     (len(goodTimeMatch) < trackLength))
         return (goodTimeMatch, rmsError, lostTrack)
 
     return ([], np.nan, None)
