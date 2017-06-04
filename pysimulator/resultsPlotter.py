@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 # from mpl_toolkits.mplot3d import Axes3D
 import seaborn.apionly as sns
+import matplotlib.cm as cm
 import xml.etree.ElementTree as ET
 from pymht.utils.xmlDefinitions import *
 import os
@@ -19,7 +20,8 @@ titleFontsize = 10
 figureWidth = 13.0*0.4 #inch
 fullPageHeight = 18.0*0.4 #inch
 halfPageHeight = 8.0 * 0.4 #inch
-linewidth = 1
+lineWidth = 1
+dpi = 600
 
 def exportInitialState():
     print("exportInitialState")
@@ -53,42 +55,24 @@ def exportAisState():
             row = [str(i)] + aisList
             writer.writerow(row)
 
-def plotTrueTracks():
-    print("plotTrueTracks")
-    import matplotlib.cm as cm
-    import itertools
-    import pymht.utils.helpFunctions as hpf
-    scenario = scenarioList[0]
-    colors1 = itertools.cycle(cm.rainbow(np.linspace(0, 1, len(scenario))))
-    simList = scenario.getSimList()
-    figure = plt.figure(figsize=(figureWidth, figureWidth), dpi=600)
-    sns.set_style(style='white')
-    ax = figure.gca()
-    hpf.plotTrueTrack(ax,simList, colors=colors1, label=True, markevery=15, fontsize=labelFontsize)
-    hpf.plotRadarOutline(ax,scenario.p0, scenario.radarRange, markCenter=False)
-    ax.set_xlabel("East [m]", fontsize=labelFontsize)
-    ax.set_ylabel("North [m]", fontsize=labelFontsize)
-    ax.set_title("True tracks", fontsize=titleFontsize)
-    ax.tick_params(labelsize=labelFontsize)
-    ax.grid(True)
-    filePath = os.path.join(simulationConfig.path, 'plots', "ScenarioTruth.pdf")
-    figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
-    figure.savefig(filePath)
-    figure.clf()
-    plt.close()
-
 def plotOverlaidRadarMeasurements():
     print("plotOverlaidRadarMeasurements")
     scenario = scenarioList[0]
     simList = scenario.getSimList()
     from .simulationConfig import lambdaphiList
     nPlots = len(lambdaphiList)
-    figure = plt.figure(figsize=(figureWidth/(nPlots-1), fullPageHeight), dpi=1200)
+    figure = plt.figure(figsize=(figureWidth/(nPlots-1), fullPageHeight), dpi=dpi)
     for i, lambda_phi in enumerate(lambdaphiList):
         scanList, _ = scenario.getSimulatedScenario(9895, simList, lambda_phi, 1.)
         ax = figure.add_subplot(nPlots, 1, i+1)
         scanList.plotFast(ax, alpha=0.4, markersize=1., markeredgewidth=0.)
         ax.axis("equal")
+        xMin, xMax = ax.get_xlim()
+        yMin, yMax = ax.get_ylim()
+        x = xMin
+        y = yMin + (yMax-yMin)*0.02
+        ax.text(x,y,"$\lambda_\phi$ = {:}".format(lambda_phi),
+                horizontalalignment='left', fontsize=9)
         ax.tick_params(axis='both', left='off', top='off', right='off',
                         bottom='off', labelleft='off', labeltop='off',
                         labelright='off', labelbottom='off')
@@ -96,6 +80,90 @@ def plotOverlaidRadarMeasurements():
     figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
     figure.savefig(filePath)
     figure.clf()
+    plt.cla()
+    plt.clf()
+    plt.close()
+
+def plotTrueTracks():
+    print("plotTrueTracks")
+    import itertools
+    plt.cla()
+    plt.clf()
+    plt.close()
+    scenario = scenarioList[0]
+    colors1 = itertools.cycle(cm.rainbow(np.linspace(0, 1, len(scenario))))
+    simList = scenario.getSimList()
+    figure = plt.figure(figsize=(figureWidth, figureWidth), dpi=dpi)
+    sns.set_style(style='white')
+    ax = figure.gca()
+    simList.plot(ax, colors=colors1, label=True, markevery=15, fontsize=labelFontsize,
+                 alpha=0.8, markeredgewidth=0.)
+    scenario.plotRadarOutline(ax, markCenter=False)
+    ax.set_title("True tracks", fontsize=titleFontsize)
+    ax.set_xlabel("East [m]", fontsize=labelFontsize)
+    ax.set_ylabel("North [m]", fontsize=labelFontsize)
+    ax.tick_params(labelsize=labelFontsize)
+    ax.grid(True)
+    filePath = os.path.join(simulationConfig.path, 'plots', "ScenarioTruth.pdf")
+    figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
+    figure.savefig(filePath)
+    figure.clf()
+    plt.cla()
+    plt.clf()
+    plt.close()
+
+def plotTrackingPercentageExample():
+    from scenarios.defaults import maxSpeedMS, M_required, N_checks, eta2, eta2_ais
+    import pymht.tracker as tomht
+    import itertools
+    scenario = scenarioList[0]
+    simList = scenario.getSimList()
+    lambda_phi = 5e-6
+    P_d = 0.6
+    N = 3
+    markEvery = max(1, int(scenario.radarPeriod / scenario.simulationTimeStep))
+    scanList, aisList = scenario.getSimulatedScenario(65945, simList, lambda_phi, P_d)
+    trackerArgs = (scenario.model,
+                   scenario.radarPeriod,
+                   lambda_phi,
+                   scenario.lambda_nu)
+
+    trackerKwargs = {'maxSpeedMS': maxSpeedMS,
+                     'M_required': M_required,
+                     'N_checks': N_checks,
+                     'position': scenario.p0,
+                     'radarRange': scenario.radarRange,
+                     'eta2': eta2,
+                     'eta2_ais': eta2_ais,
+                     'N': N,
+                     'P_d': P_d}
+    tracker = tomht.Tracker(*trackerArgs, **trackerKwargs)
+    for measurementList in scanList:
+        scanTime = measurementList.time
+        aisMeasurements = aisList.getMeasurements(scanTime)
+        tracker.addMeasurementList(measurementList, aisMeasurements)
+
+    figure = plt.figure(figsize=(figureWidth/2, halfPageHeight), dpi=dpi)
+    ax = figure.gca()
+    colors = itertools.cycle(cm.rainbow(np.linspace(0, 0, 100)))
+    simList.plot(ax,markevery=markEvery, alpha=0.2)
+    tracker.plotActiveTracks(ax, colors=colors, markInitial=True, markStates=False, markID=False, markEnd=False)
+    tracker.plotTerminatedTracks(ax, colors=colors, markInitial=True, markStates=False, markID=False, markEnd=False)
+    ax.axis("equal")
+    ax.set_xlim(-2700, -2000)
+    ax.set_ylim(2000, 3400)
+    ax.set_xlabel("East [m]", fontsize=labelFontsize)
+    ax.set_ylabel("North [m]", fontsize=labelFontsize)
+    ax.tick_params(axis='both', left='on', top='off', right='off',
+                   bottom='on', labelleft='on', labeltop='off',
+                   labelright='off', labelbottom='on', labelsize=labelFontsize)
+    ax.xaxis.set_ticks(np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 3))
+    filePath = os.path.join(simulationConfig.path, 'plots', "TrackingPercentageExample.pdf")
+    figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
+    figure.savefig(filePath)
+    figure.clf()
+    plt.cla()
+    plt.clf()
     plt.close()
 
 def plotTrackLoss(loadFilePath):
@@ -156,7 +224,11 @@ def plotInitializationTime(loadFilePath):
     simLength = float(scenarioSettingsElement.find("simTime").text)
     timeStep = float(scenarioSettingsElement.find("radarPeriod").text)
     nTargets = len(groundtruthElement.findall(trackTag))
-    _plotInitializationTime2D(variationsInitLog, loadFilePath, simLength, timeStep, nTargets)
+    timeArray = np.arange(0, simLength, timeStep)
+    plotData = _processVariationInitLog(variationsInitLog, simLength, timeStep, nTargets)
+    threshold = 0.8
+    _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTargets)
+    _plotInitializationPerformance(plotData, loadFilePath, timeArray, threshold)
     plt.close()
 
 def plotTrackCorrectness(loadFilePath):
@@ -288,7 +360,6 @@ def _getInitializationTimePlotData(variationsElement):
                 falseInitTimeLog[time][0] += change[0]
                 falseInitTimeLog[time][1] += (change[0] + change[1])
 
-
         for k,v in correctInitTimeLog.items():
             correctInitTimeLog[k] = float(v) / float(len(runElementList))
 
@@ -364,7 +435,7 @@ def _getRuntimePlotData(variationsElement, percentile):
     return plotData
 
 def _plotTrackLossPercentage(plotData):
-    figure = plt.figure(figsize=(figureWidth,halfPageHeight), dpi=600)
+    figure = plt.figure(figsize=(figureWidth,halfPageHeight), dpi=dpi)
     colors = sns.color_palette(n_colors=5)
     sns.set_style(style='white')
     ax = figure.gca()
@@ -396,11 +467,11 @@ def _plotTrackLossPercentage(plotData):
             nSet.clear()
         pdSet.add(P_d)
         nSet.add(N)
-        ax.plot(x,y,
+        ax.plot(x, y,
                 label = "$P_D$={0:}, N={1:.0f}".format(P_d, N),
                 c = colors[len(nSet)-1],
                 linestyle=linestyleList[len(pdSet)-1],
-                linewidth = linewidth,
+                linewidth = lineWidth,
                 marker='*' if len(x) == 1 else None)
     lambdaPhiList = list(lambdaPhiSet)
     lambdaPhiList.sort()
@@ -419,7 +490,7 @@ def _plotTrackLossPercentage(plotData):
     return figure
 
 def _plotTrackingPercentage(plotData):
-    figure = plt.figure(figsize=(figureWidth, halfPageHeight), dpi=600)
+    figure = plt.figure(figsize=(figureWidth, halfPageHeight), dpi=dpi)
     sns.set_style(style='white')
     ax = figure.gca()
 
@@ -456,7 +527,7 @@ def _plotTrackingPercentage(plotData):
                 label="$P_D$={0:}, N={1:.0f}".format(P_d, N),
                 c=colors[len(nSet) - 1],
                 linestyle=linestyleList[len(pdSet) - 1],
-                linewidth=linewidth,
+                linewidth=lineWidth,
                 marker='*' if len(x)==1 else None)
 
     lambdaPhiList = list(lambdaPhiSet)
@@ -473,47 +544,71 @@ def _plotTrackingPercentage(plotData):
     figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
     return figure
 
+def _plotInitializationPerformance(plotData, loadFilePath, timeArray, threshold):
+    bigM = 1000
+    savePath = _getSavePath(loadFilePath, "Performance")
+    mSet = set()
+    nSet = set()
+    resultList = []
+    for M_init, d1 in plotData.items():
+        mSet.add(int(M_init))
+        for N_init, d2 in d1.items():
+            nSet.add(int(N_init))
+            (cpfmList, _, accFalseTrackList) = d2
+            costList = []
+            for i, (P_d, lambda_phi, accFalseTrack) in enumerate(accFalseTrackList):
+                (_, _, cpmf) = cpfmList[i]
+                avgNumFalseTrackAlive = np.mean(accFalseTrack)
+                if not np.any(np.array(cpmf)>threshold):
+                    index = np.nan
+                    initTime = bigM
+                else:
+                    index = np.argmax(cpmf>threshold)
+                    initTime = timeArray[index]
+                cost = float(initTime) * (1. + float(avgNumFalseTrackAlive))
+                costList.append(cost)
+            avg = np.mean(costList)
+            resultList.append((int(M_init), int(N_init), float(avg)))
+    plotArray = np.ones((len(mSet),len(nSet)), dtype=np.float32)*np.nan
+    mList = sorted(list(mSet))
+    nList = sorted(list(nSet))
+    for M, N, cost in resultList:
+        mIndex = mList.index(M)
+        nIndex = nList.index(N)
+        plotArray[mIndex][nIndex] = np.sqrt(cost)
+
+    figure = plt.figure(figsize=(figureWidth, fullPageHeight/3), dpi=dpi)
+    ax = figure.gca()
+    cax = ax.matshow(plotArray)
+    cax.set_clim(0,25.)
+    cax.set_cmap(cm.jet)
+    colorbar = figure.colorbar(cax)
+    colorbar.ax.tick_params(labelsize=labelFontsize)
+    ax.set_xlabel("N", fontsize=labelFontsize)
+    ax.set_ylabel("M", fontsize=labelFontsize)
+    ax.set_xticklabels(['']+nList)
+    ax.set_yticklabels(['']+mList)
+    ax.tick_params(labelsize=labelFontsize)
+    ax.xaxis.tick_bottom()
+    ax.set_title("M/N initialization", fontsize=titleFontsize)
+    figure.tight_layout()
+    figure.savefig(savePath)
+    figure.clf()
+    plt.cla()
+    plt.clf()
+    plt.close()
+
 def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTargets):
     timeArray = np.arange(0, simLength, timeStep)
     for M_init, d1 in plotData.items():
         for N_init, d2 in d1.items():
-            figure = plt.figure(figsize=(figureWidth, fullPageHeight), dpi=600)
-
+            figure = plt.figure(figsize=(figureWidth, fullPageHeight), dpi=dpi)
             ax11 = figure.add_subplot(311)
             ax12 = figure.add_subplot(312)
             ax13 = figure.add_subplot(313)
-
             sns.set_style(style='white')
             savePath = _getSavePath(loadFilePath, "Time({0:}-{1:})".format(M_init, N_init))
-            cpfmList = []
-            falseCPFMlist = []
-            accFalseTrackList = []
-            for k, (lambda_phi, d3) in enumerate(d2.items()):
-                for j, (P_d, (correctInitTimeLog, falseInitTimeLog)) in enumerate(d3.items()):
-                    falsePFM = np.zeros_like(timeArray)
-                    pmf = np.zeros_like(timeArray)
-                    falseTrackDelta = np.zeros_like(timeArray)
-                    for i, time in enumerate(timeArray):
-                        if str(time) in correctInitTimeLog:
-                            pmf[i] = correctInitTimeLog[str(time)]
-                        if str(time) in falseInitTimeLog:
-                            falsePFM[i] = falseInitTimeLog[str(time)][0]
-                            falseTrackDelta[i] = falseInitTimeLog[str(time)][1]
-                    cpmf = np.cumsum(pmf) / float(nTargets)
-                    falseCPFM = np.cumsum(falsePFM)
-                    falseTrackDelta = np.cumsum(falseTrackDelta)
-                    cpfmList.append((P_d, lambda_phi, cpmf))
-                    falseCPFMlist.append((P_d, lambda_phi, falseCPFM))
-                    accFalseTrackList.append((P_d, lambda_phi, falseTrackDelta))
-            cpfmList.sort(key=lambda tup: float(tup[1]))
-            cpfmList.sort(key=lambda tup: float(tup[0]), reverse=True)
-
-            falseCPFMlist.sort(key=lambda tup: float(tup[1]))
-            falseCPFMlist.sort(key=lambda tup: float(tup[0]), reverse=True)
-
-            accFalseTrackList.sort(key=lambda tup: float(tup[1]))
-            accFalseTrackList.sort(key=lambda tup: float(tup[0]), reverse=True)
-
+            (cpfmList, falseCPFMlist, accFalseTrackList) = d2
             pdSet = set()
             lambdaPhiSet = set()
             for P_d, lambda_phi, cpmf in cpfmList:
@@ -522,11 +617,11 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                 pdSet.add(P_d)
                 lambdaPhiSet.add(lambda_phi)
                 ax11.plot(timeArray,
-                        cpmf,
-                        label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
-                        c=colors[len(pdSet)-1],
-                        linestyle=linestyleList[len(lambdaPhiSet)-1],
-                        linewidth=linewidth)
+                          cpmf,
+                          label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
+                          c=colors[len(pdSet)-1],
+                          linestyle=linestyleList[len(lambdaPhiSet)-1],
+                          linewidth=lineWidth)
 
             pdSet = set()
             lambdaPhiSet = set()
@@ -536,11 +631,11 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                 pdSet.add(P_d)
                 lambdaPhiSet.add(lambda_phi)
                 ax12.semilogy(timeArray,
-                        cpmf+(1e-10),
-                        label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
-                        c=colors[len(pdSet)-1],
-                        linestyle=linestyleList[len(lambdaPhiSet)-1],
-                        linewidth=linewidth)
+                              cpmf + (1e-10),
+                              label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
+                              c=colors[len(pdSet)-1],
+                              linestyle=linestyleList[len(lambdaPhiSet)-1],
+                              linewidth=lineWidth)
 
             pdSet = set()
             lambdaPhiSet = set()
@@ -551,10 +646,10 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                 lambdaPhiSet.add(lambda_phi)
                 ax13.plot(timeArray,
                           accFalseTrack,
-                         label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
-                         c=colors[len(pdSet) - 1],
-                         linestyle=linestyleList[len(lambdaPhiSet) - 1],
-                            linewidth=linewidth)
+                          label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
+                          c=colors[len(pdSet) - 1],
+                          linestyle=linestyleList[len(lambdaPhiSet) - 1],
+                          linewidth=lineWidth)
 
             ax11.set_xlabel("Time [s]", fontsize=labelFontsize)
             ax11.set_ylabel("Average cpfm", fontsize=labelFontsize)
@@ -597,7 +692,7 @@ def _plotTrackingCorrectness(plotData):
     return plt.figure()
 
 def _plotTimeLog(plotData, radarPeriod=None):
-    figure = plt.figure(figsize=(figureWidth, halfPageHeight), dpi=600)
+    figure = plt.figure(figsize=(figureWidth, halfPageHeight), dpi=dpi)
     ax = figure.gca()
     sns.set_style(style='white')
 
@@ -615,9 +710,9 @@ def _plotTimeLog(plotData, radarPeriod=None):
             x = np.array(x)
             y = np.array(y)
             x, y = (list(t) for t in zip(*sorted(zip(x, y))))
-            ax.plot(x,y, linestyle=linestyleList[i], color=colors[j],
-                     label="$P_D$={0:}, $\lambda_\phi$={1:}".format(P_d, lambda_phi),
-                    linewidth=linewidth)
+            ax.plot(x, y, linestyle=linestyleList[i], color=colors[j],
+                    label="$P_D$={0:}, $\lambda_\phi$={1:}".format(P_d, lambda_phi),
+                    linewidth=lineWidth)
     if radarPeriod is not None:
         ax.plot([min(nSet), max(nSet)],[radarPeriod, radarPeriod],
                 color='black', linestyle='--', linewidth=1, alpha=0.7)
@@ -645,3 +740,43 @@ def _getSavePath(loadFilePath, nameAdd):
     if not os.path.exists(savePath):
         os.makedirs(savePath)
     return saveFilePath
+
+def _processVariationInitLog(variationInitLog, simLength, timeStep, nTargets):
+    plotData = dict()
+    timeArray = np.arange(0, simLength, timeStep)
+    for M_init, d1 in variationInitLog.items():
+        if M_init not in plotData:
+            plotData[M_init] = dict()
+        for N_init, d2 in d1.items():
+            if N_init not in plotData[M_init]:
+                plotData[M_init][N_init] = dict()
+            cpfmList = []
+            falseCPFMlist = []
+            accFalseTrackList = []
+            for k, (lambda_phi, d3) in enumerate(d2.items()):
+                for j, (P_d, (correctInitTimeLog, falseInitTimeLog)) in enumerate(d3.items()):
+                    falsePFM = np.zeros_like(timeArray)
+                    pmf = np.zeros_like(timeArray)
+                    falseTrackDelta = np.zeros_like(timeArray)
+                    for i, time in enumerate(timeArray):
+                        if str(time) in correctInitTimeLog:
+                            pmf[i] = correctInitTimeLog[str(time)]
+                        if str(time) in falseInitTimeLog:
+                            falsePFM[i] = falseInitTimeLog[str(time)][0]
+                            falseTrackDelta[i] = falseInitTimeLog[str(time)][1]
+                    cpmf = np.cumsum(pmf) / float(nTargets)
+                    falseCPFM = np.cumsum(falsePFM)
+                    falseTrackDelta = np.cumsum(falseTrackDelta)
+                    cpfmList.append((P_d, lambda_phi, cpmf))
+                    falseCPFMlist.append((P_d, lambda_phi, falseCPFM))
+                    accFalseTrackList.append((P_d, lambda_phi, falseTrackDelta))
+            cpfmList.sort(key=lambda tup: float(tup[1]))
+            cpfmList.sort(key=lambda tup: float(tup[0]), reverse=True)
+            falseCPFMlist.sort(key=lambda tup: float(tup[1]))
+            falseCPFMlist.sort(key=lambda tup: float(tup[0]), reverse=True)
+            accFalseTrackList.sort(key=lambda tup: float(tup[1]))
+            accFalseTrackList.sort(key=lambda tup: float(tup[0]), reverse=True)
+
+            plotData[M_init][N_init] = (cpfmList, falseCPFMlist, accFalseTrackList)
+
+    return plotData
