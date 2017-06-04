@@ -7,6 +7,7 @@ def plotResults(filePathList, initFilePathList):
     resultsPlotter.exportAisState()
     resultsPlotter.plotOverlaidRadarMeasurements()
     resultsPlotter.plotTrueTracks()
+    resultsPlotter.plotTrackingPercentageExample()
     with mp.Pool() as pool:
         pool.map(resultsPlotter.plotInitializationTime, initFilePathList)
         pool.map(resultsPlotter.plotTrackLoss, filePathList)
