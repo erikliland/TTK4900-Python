@@ -24,6 +24,52 @@ halfPageHeight = 8.0 * 0.4 #inch
 lineWidth = 1
 dpi = 600
 
+def exportTrackingPercentageImprovement(filePathList):
+    assert len(filePathList) > 1
+    referenceFilePath = filePathList[0]
+    referenceRoot = ET.parse(referenceFilePath).getroot()
+    referenceGroundTruthElement = referenceRoot.find(groundtruthTag)
+    referenceVariationsElement = referenceRoot.findall('.Variations[@preinitialized="True"]')[0]
+    referencePerformance = _getTrackingPercentagePlotData(referenceGroundTruthElement, referenceVariationsElement)
+
+    comparePerformanceList = []
+    for path in filePathList[1:]:
+        root = ET.parse(path).getroot()
+        groundtruthElement = root.find(groundtruthTag)
+        variationsElement = root.findall('.Variations[@preinitialized="True"]')[0]
+        performance = _getTrackingPercentagePlotData(groundtruthElement, variationsElement)
+        comparePerformanceList.append(performance)
+    nCompareScenarios = len(filePathList[1:])
+    pdSet = set()
+    nSet = set()
+    lambdaphiSet = set()
+    for Pd, d1 in referencePerformance.items():
+        pdSet.add(Pd)
+        for N, d2 in d1.items():
+            nSet.add(N)
+            for lambda_phi in d2.keys():
+                lambdaphiSet.add(lambda_phi)
+    filePath = os.path.join(simulationConfig.path, 'plots', "Scenario_Improvements.csv")
+    changeMatrix = np.zeros((len(pdSet)*len(nSet), nCompareScenarios))
+    pdList = sorted(list(pdSet))
+    nList = sorted(list(nSet))
+    lambda_phi = sorted(list(lambdaphiSet))[-1]
+    for i, performance in enumerate(comparePerformanceList):
+        for j, Pd in enumerate(pdList):
+            for k, N in enumerate(nList):
+                referenceValue = referencePerformance[Pd][N][lambda_phi]
+                compareValue = performance[Pd][N][lambda_phi]
+                improvement = (compareValue-referenceValue)/referenceValue
+                changeMatrix[j*len(nList) + k][i] = improvement * 100
+    with open(filePath, 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Pd", "N"]+ ["S"+str(int(scenarioIndex + 1)) for scenarioIndex in range(nCompareScenarios)])
+        for i, row in enumerate(changeMatrix):
+            Pd = pdList[i//len(nList)]
+            N = nList[i%len(pdList)]
+            strRow = [str(int(Pd*100))+'%', str(int(N))] + ["{:3.0f}%".format(change) for change in row]
+            writer.writerow(strRow)
+
 def exportInitialState():
     print("exportInitialState")
     filePath = os.path.join(simulationConfig.path, 'plots', "Scenario_Initial_State.csv")
@@ -550,8 +596,8 @@ def _plotTrackingPercentage(plotData):
     return figure
 
 def _plotInitializationPerformance(plotData, loadFilePath, timeArray, threshold):
-    bigM = 900
-    normalizationConstant = 18.2
+    bigM = 1000
+    normalizationConstant = 26.2
     savePath = _getSavePath(loadFilePath, "Performance")
     mSet = set()
     nSet = set()
