@@ -1,12 +1,12 @@
 import os
 from pysimulator.scenarios.scenarios import scenarioList
-from pymht.models.pv import sigmaR_RADAR_true
+from pymht.models.constants import sigmaR_RADAR_true
 
 pdList = [0.9, 0.7, 0.5]
 lambdaphiList = [0, 5e-6, 1e-5]
 nList = [1, 3, 6, 9]
 path = os.path.join(os.path.expanduser('~'), 'TTK4900-Python', 'data')
-nMonteCarlo = 20
+nMonteCarlo = 25
 scenarioList = scenarioList
 trackingFilePathList = [os.path.join(path, scenario.name + "_Tracking" + ".xml") for scenario in scenarioList]
 initFilePathList = [os.path.join(path, scenario.name + "_Init" + ".xml") for scenario in scenarioList]
