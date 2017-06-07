@@ -82,9 +82,6 @@ def analyzeVariationInitializationPerformance(groundtruthList, variation, thresh
         for initiationLogElement in runElement.findall(initializationLogTag):
             runElement.remove(initiationLogElement)
         initiationLog, falseInitiationLog = _matchAndTimeInitialTracks(groundtruthList, runElement, threshold)
-        # print("initiationLog",initiationLog)
-        # print("falseInitiationLog",falseInitiationLog)
-        # steadyStateErroneousTracks = _steadyState(falseInitiationLog)
         _storeInitializationLog(runElement, initiationLog, falseInitiationLog)
 
 def _matchTrueWithEstimatedTracks(truetrackList, estimateTrackList, threshold, lastScanTime):
@@ -175,6 +172,7 @@ def _matchAndTimeInitialTracks(groundtruthList, runElement, threshold):
             for j, (id, stateElement) in enumerate(uninitiatedTracks):
                 distance = np.linalg.norm(_parsePosition(initiator[2].find(positionTag)) -
                                           _parsePosition(stateElement.find(positionTag)))
+                # stateDelta = np.linalg.norm(_parseState(initiator[2]), _parseState(stateElement))
                 deltaMatrix[i,j] = distance
         deltaMatrix[deltaMatrix>threshold] = np.inf
 
@@ -346,6 +344,15 @@ def _parsePosition(positionElement):
     east = positionElement.find(eastTag).text
     position = np.array([east, north], dtype=np.double)
     return position
+
+_parseVelocity = _parsePosition
+
+def _parseState(stateElement):
+    position = _parsePosition(stateElement.find(positionTag))
+    velocity = _parseVelocity(stateElement.find(velocityTag))
+    state = np.hstack(position,velocity)
+    assert state.ndim == 1
+    return state
 
 def _multiplePossibleMatches(resultList):
     import collections

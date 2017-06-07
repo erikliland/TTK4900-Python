@@ -24,7 +24,55 @@ halfPageHeight = 8.0 * 0.4 #inch
 lineWidth = 1
 dpi = 600
 
+def exportTrackLossImprovement(filePathList):
+    print("exportTrackLossImprovement")
+    assert len(filePathList) > 1
+    referenceFilePath = filePathList[0]
+    referenceRoot = ET.parse(referenceFilePath).getroot()
+    referenceGroundTruthElement = referenceRoot.find(groundtruthTag)
+    referenceVariationsElement = referenceRoot.findall('.Variations[@preinitialized="True"]')[0]
+    referencePerformance = _getTrackLossPlotData(referenceGroundTruthElement, referenceVariationsElement)
+
+    comparePerformanceList = []
+    for path in filePathList[1:]:
+        root = ET.parse(path).getroot()
+        groundtruthElement = root.find(groundtruthTag)
+        variationsElement = root.findall('.Variations[@preinitialized="True"]')[0]
+        performance = _getTrackLossPlotData(groundtruthElement, variationsElement)
+        comparePerformanceList.append(performance)
+    nCompareScenarios = len(filePathList[1:])
+    pdSet = set()
+    nSet = set()
+    lambdaphiSet = set()
+    for Pd, d1 in referencePerformance.items():
+        pdSet.add(Pd)
+        for N, d2 in d1.items():
+            nSet.add(N)
+            for lambda_phi in d2.keys():
+                lambdaphiSet.add(lambda_phi)
+    filePath = os.path.join(simulationConfig.path, 'plots', "Track_Loss_Improvement.csv")
+    changeMatrix = np.zeros((len(pdSet)*len(nSet), nCompareScenarios))
+    pdList = sorted(list(pdSet))
+    nList = sorted(list(nSet))
+    lambda_phi = sorted(list(lambdaphiSet))[-1]
+    for i, performance in enumerate(comparePerformanceList):
+        for j, Pd in enumerate(pdList):
+            for k, N in enumerate(nList):
+                referenceValue = referencePerformance[Pd][N][lambda_phi]
+                compareValue = performance[Pd][N][lambda_phi]
+                improvement = (compareValue-referenceValue)/referenceValue
+                changeMatrix[j*len(nList) + k][i] = abs(improvement * -100)
+    with open(filePath, 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Pd", "N"]+ ["S"+str(int(scenarioIndex + 1)) for scenarioIndex in range(nCompareScenarios)])
+        for i, row in enumerate(changeMatrix):
+            Pd = pdList[i//len(nList)]
+            N = nList[i%len(nList)]
+            strRow = [str(int(Pd*100))+'%', str(int(N))] + ["{:3.0f}%".format(change) for change in row]
+            writer.writerow(strRow)
+
 def exportTrackingPercentageImprovement(filePathList):
+    print("exportTrackingPercentageImprovement")
     assert len(filePathList) > 1
     referenceFilePath = filePathList[0]
     referenceRoot = ET.parse(referenceFilePath).getroot()
@@ -49,7 +97,7 @@ def exportTrackingPercentageImprovement(filePathList):
             nSet.add(N)
             for lambda_phi in d2.keys():
                 lambdaphiSet.add(lambda_phi)
-    filePath = os.path.join(simulationConfig.path, 'plots', "Scenario_Improvements.csv")
+    filePath = os.path.join(simulationConfig.path, 'plots', "Tracking_Percentage_Improvement.csv")
     changeMatrix = np.zeros((len(pdSet)*len(nSet), nCompareScenarios))
     pdList = sorted(list(pdSet))
     nList = sorted(list(nSet))
@@ -66,7 +114,7 @@ def exportTrackingPercentageImprovement(filePathList):
         writer.writerow(["Pd", "N"]+ ["S"+str(int(scenarioIndex + 1)) for scenarioIndex in range(nCompareScenarios)])
         for i, row in enumerate(changeMatrix):
             Pd = pdList[i//len(nList)]
-            N = nList[i%len(pdList)]
+            N = nList[i%len(nList)]
             strRow = [str(int(Pd*100))+'%', str(int(N))] + ["{:3.0f}%".format(change) for change in row]
             writer.writerow(strRow)
 
@@ -160,6 +208,7 @@ def plotTrueTracks():
     plt.close()
 
 def plotTrackingPercentageExample():
+    print("plotTrackingPercentageExample")
     from scenarios.defaults import maxSpeedMS, M_required, N_checks, eta2, eta2_ais
     import pymht.tracker as tomht
     import itertools
@@ -279,6 +328,8 @@ def plotInitializationTime(loadFilePath):
     threshold = 0.8
     _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTargets)
     _plotInitializationPerformance(plotData, loadFilePath, timeArray, threshold)
+    plt.cla()
+    plt.clf()
     plt.close()
 
 def plotTrackCorrectness(loadFilePath):
