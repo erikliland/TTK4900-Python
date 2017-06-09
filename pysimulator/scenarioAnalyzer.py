@@ -18,7 +18,6 @@ def analyzeTrackingFile(filePath):
     groundtruthElement = scenarioElement.find(groundtruthTag)
     scenariosettingsElement = scenarioElement.find(scenariosettingsTag)
     variationsList = scenarioElement.findall(variationsTag)
-    # print("Scenario name:", scenariosettingsElement.find(nameTag).text)
     groundtruthList = groundtruthElement.findall(trackTag)
 
     initTime = float(scenariosettingsElement.find("initTime").text)
@@ -365,8 +364,3 @@ def _multiplePossibleMatches(resultList):
         sortedDuplicates = sorted(duplicateTuples, key=lambda tup: tup[1])
         for e in sortedDuplicates[1:]:
             resultList.remove(e[0])
-
-def _steadyState(falseInitiationLog):
-    nErroneousTracksAlive = 3
-    steadyStateErroneousTracks = 4
-    return steadyStateErroneousTracks
