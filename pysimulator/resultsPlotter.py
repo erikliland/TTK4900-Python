@@ -157,6 +157,7 @@ def plotOverlaidRadarMeasurements():
     from .simulationConfig import lambdaphiList
     nPlots = len(lambdaphiList)
     figure = plt.figure(figsize=(figureWidth/(nPlots-1), fullPageHeight), dpi=dpi)
+    sns.set_style(style='white')
     for i, lambda_phi in enumerate(lambdaphiList):
         scanList, _ = scenario.getSimulatedScenario(9895, simList, lambda_phi, 1.)
         ax = figure.add_subplot(nPlots, 1, i+1)
@@ -171,13 +172,15 @@ def plotOverlaidRadarMeasurements():
         ax.tick_params(axis='both', left='off', top='off', right='off',
                         bottom='off', labelleft='off', labeltop='off',
                         labelright='off', labelbottom='off')
-    filePath = os.path.join(simulationConfig.path, 'plots', "ScenarioOverlaid.pdf")
+    filePath = os.path.join(simulationConfig.path, 'plots', "ScenarioOverlaid.png")
     figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
-    figure.savefig(filePath)
+    figure.savefig(filePath, dpi=dpi)
     figure.clf()
     plt.cla()
     plt.clf()
     plt.close()
+
+    return None
 
 def plotTrueTracks():
     print("plotTrueTracks")
@@ -346,9 +349,7 @@ def plotTrackCorrectness(loadFilePath):
     # groundtruthElement = scenarioElement.find(groundtruthTag)
     variationsElement = scenarioElement.findall('.Variations[@preinitialized="True"]')[0]
     plotData = _getTrackingCorrectnessPlotData(variationsElement)
-    figure = _plotTrackingCorrectness(plotData)
-    figure.savefig(savePath)
-    plt.close()
+    figure = _plotTrackingCorrectness(plotData, savePath)
 
 def plotRuntime(loadFilePath):
     if loadFilePath is None: return
@@ -361,13 +362,12 @@ def plotRuntime(loadFilePath):
         print(e)
         return
     scenarioElement = tree.getroot()
-    groundtruthElement = scenarioElement.find(groundtruthTag)
+    # groundtruthElement = scenarioElement.find(groundtruthTag)
     scenarioSettingsElement = scenarioElement.find(scenariosettingsTag)
     variationsElement = scenarioElement.find(
         '.{0:}[@{1:}="{2:}"]'.format(variationsTag, preinitializedTag, True))
     runtimeLog = _getRuntimePlotData(variationsElement, percentile=10.)
     radarPeriod = float(scenarioSettingsElement.find("radarPeriod").text)
-    # print("runtimeLog", *[str(k)+str(v) for k,v in runtimeLog.items()], sep="\n")
     figure = _plotTimeLog(runtimeLog, radarPeriod)
     figure.savefig(savePath)
     plt.close()
@@ -494,9 +494,36 @@ def _getTrackingCorrectnessPlotData(variationsElement):
         smoothRmsList = []
         runList = variationElement.findall(runTag)
         for runElement in runList:
+            unsmoothList = []
+            smoothList = []
             trackList = runElement.findall(trackTag)
             for trackElement in trackList:
-                pass
+                if not matchidTag in trackElement.attrib:
+                    continue
+                statesElement = trackElement.find(statesTag)
+                smoothedStatesElement = trackElement.find(smoothedstatesTag)
+                unsmoothedRms = float(statesElement.get(rmserrorTag, np.nan))
+                smoothedRms = float(smoothedStatesElement.get(rmserrorTag, np.nan))
+                if math.isnan(unsmoothedRms) or math.isnan(smoothedRms):
+                    continue
+                assert np.isfinite(unsmoothedRms), str(unsmoothedRms)
+                assert np.isfinite(smoothedRms), str(smoothedRms)
+                unsmoothList.append(unsmoothedRms)
+                smoothList.append((smoothedRms))
+            originalRmsList.append(np.mean(unsmoothList))
+            smoothRmsList.append(np.mean(smoothList))
+
+        avgRms = np.mean(originalRmsList)
+        avgSmoothRms = np.mean(smoothRmsList)
+
+        if N not in plotData:
+            plotData[N] = {}
+        if P_d not in plotData[N]:
+            plotData[N][P_d] = {}
+        if lambda_phi not in plotData[N][P_d]:
+            plotData[N][P_d][lambda_phi] = (avgRms, avgSmoothRms)
+        else:
+            raise KeyError("Duplicate key found")
 
     return plotData
 
@@ -520,12 +547,6 @@ def _getRuntimePlotData(variationsElement, percentile):
         meanRuntimeArray = np.mean(runtimeArray, axis=0)
         percentiles = np.percentile(meanRuntimeArray,[percentile, 100.-percentile])
         meanRuntime = np.mean(meanRuntimeArray)
-        # print("runtimeArray", np.array_str(runtimeArray, precision=6))
-        # print("meanRunetimeArray", np.array_str(meanRuntimeArray, precision=6))
-        # print("Percentile", np.array_str(percentiles, precision=6))
-        # print()
-        # plt.hist(meanRuntimeArray)
-        # plt.show()
         if P_d not in plotData:
             plotData[P_d] = {}
         if lambda_phi not in plotData[P_d]:
@@ -663,7 +684,6 @@ def _plotInitializationPerformance(plotData, loadFilePath, timeArray, threshold)
                 (_, _, cpmf) = cpfmList[i]
                 avgNumFalseTrackAlive = np.mean(accFalseTrack)
                 if not np.any(np.array(cpmf)>threshold):
-                    index = np.nan
                     initTime = bigM
                 else:
                     index = np.argmax(cpmf>threshold)
@@ -723,7 +743,7 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                 pdSet.add(P_d)
                 lambdaPhiSet.add(lambda_phi)
                 ax11.plot(timeArray,
-                          cpmf,
+                          cpmf*100.,
                           label="$P_D$ = {0:}, $\lambda_\phi$ = {1:}".format(P_d, float(lambda_phi)),
                           c=colors[len(pdSet)-1],
                           linestyle=linestyleList[len(lambdaPhiSet)-1],
@@ -758,12 +778,12 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
                           linewidth=lineWidth)
 
             ax11.set_xlabel("Time [s]", fontsize=labelFontsize)
-            ax11.set_ylabel("Average cpfm", fontsize=labelFontsize)
-            ax11.set_title("Cumulative Probability Mass Function", fontsize=titleFontsize)
+            ax11.set_ylabel("True tracks initialized [%]", fontsize=labelFontsize)
+            ax11.set_title("Percentage of true tracks initialized", fontsize=titleFontsize)
             ax11.legend(loc=4, ncol=len(pdSet), fontsize=legendFontsize)
             ax11.grid(False)
             ax11.set_xlim(0, simLength)
-            ax11.set_ylim(0,1)
+            ax11.set_ylim(0,100)
             ax11.xaxis.set_ticks(np.arange(0,simLength+15, 15))
             ax11.tick_params(labelsize=labelFontsize)
             sns.despine(ax=ax11, offset=0)
@@ -773,7 +793,7 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
             ax12.set_title("Accumulative number of erroneous tracks", fontsize=titleFontsize)
             ax12.grid(False)
             ax12.set_xlim(0, simLength)
-            ax12.set_ylim(1e-3,1000)
+            ax12.set_ylim(1e-3,2000)
             ax12.xaxis.set_ticks(np.arange(0,simLength+15, 15))
             ax12.tick_params(labelsize=labelFontsize)
             sns.despine(ax=ax12, offset=0)
@@ -794,8 +814,56 @@ def _plotInitializationTime2D(plotData, loadFilePath, simLength, timeStep, nTarg
 
             plt.close()
 
-def _plotTrackingCorrectness(plotData):
-    return plt.figure()
+def _plotTrackingCorrectness(plotData, savePath):
+    figure = plt.figure(figsize=(figureWidth, halfPageHeight), dpi=dpi)
+    sns.set_style(style='white')
+    ax = figure.gca()
+
+    lambdaPhiRef = 1.0e-5
+    rmsErrorList = []
+    pdSet = set()
+    for j, (N, d1) in enumerate(plotData.items()):
+        xList = []
+        yList = []
+        for i, (P_d, d2) in enumerate(d1.items()):
+            pdSet.add(P_d)
+            for lambda_phi, (unsmoothRms, smoothRms) in d2.items():
+                if math.isclose(lambda_phi, lambdaPhiRef):
+                    xList.append(P_d)
+                    yList.append([unsmoothRms, smoothRms])
+        xArray = np.array(xList)
+        yArray = np.array(yList)
+        rmsErrorList.append((N, xArray, yArray))
+
+    rmsErrorList.sort(key=lambda tup: float(tup[0]), reverse=False)
+
+    for i, (N, x, y) in enumerate(rmsErrorList):
+        ax.plot(x*100, y[:,0],
+                label="N={:.0f}".format(N),
+                c=colors[i],
+                linestyle=linestyleList[0],
+                linewidth=lineWidth)
+        ax.plot(x*100, y[:,1],
+                label="N={:.0f}, Smooth".format(N),
+                c=colors[i],
+                linestyle=linestyleList[1],
+                linewidth=lineWidth)
+
+    ax.set_xlabel("$P_d$ [%]", fontsize=labelFontsize)
+    ax.set_ylabel("Average RMS error", fontsize=labelFontsize)
+    # ax.set_title("RMS Error", fontsize=titleFontsize)
+    ax.set_ylim(0.0, 10.0)
+    ax.set_xlim(min(pdSet)*100, max(pdSet)*100)
+    ax.xaxis.set_ticks(np.array(sorted(list(pdSet)))*100)
+    ax.legend(loc=0, fontsize=legendFontsize)
+    ax.tick_params(labelsize=labelFontsize)
+    sns.despine(ax=ax, offset=0)
+    figure.tight_layout(pad=0.8, h_pad=0.8, w_pad=0.8)
+    figure.savefig(savePath)
+    figure.clf()
+    plt.cla()
+    plt.clf()
+    plt.close()
 
 def _plotTimeLog(plotData, radarPeriod=None):
     figure = plt.figure(figsize=(figureWidth, halfPageHeight), dpi=dpi)
@@ -823,6 +891,8 @@ def _plotTimeLog(plotData, radarPeriod=None):
         ax.plot([min(nSet), max(nSet)],[radarPeriod, radarPeriod],
                 color='black', linestyle='--', linewidth=1, alpha=0.7)
 
+    ax.text(min(nSet), radarPeriod, "Radar period: {:}s".format(radarPeriod),
+            fontsize=labelFontsize, verticalalignment='bottom')
     ax.set_xlim(ax.get_xlim()[0]-0.5, ax.get_xlim()[1]+0.5)
     ax.set_ylim(0.0,5.0)
     ax.set_title("Tracking iteration runtime", fontsize=titleFontsize)
