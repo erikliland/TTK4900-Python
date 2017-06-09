@@ -22,15 +22,15 @@ def runSimulation(**kwargs):
     avgToc = []
     tic0 = time.time()
 
-    scenario = simulationConfig.scenarioList[0]
+    scenario = simulationConfig.scenarioList[4]
     print(scenario.name)
 
     i=4
     seed = simulationConfig.baseSeed + i - 1
     simTime = scenario.radarPeriod * 60  # sec
-    lambda_phi = 5e-6
+    lambda_phi = 1e-5
     P_d = 0.5 # Probability of detection
-    N = 3  # Number of  timesteps to tail (N-scan)
+    N = 1  # Number of  timesteps to tail (N-scan)
     M_required = 2
     N_checks = 4
     desiredPlotPeriod = scenario.radarPeriod
@@ -80,12 +80,12 @@ def runSimulation(**kwargs):
 
     if kwargs.get('storeMovie', False):
         import matplotlib.animation as animation
-        metadata = dict(title='Movie Test', artist='Matplotlib',
-                        comment='Movie support!')
+        metadata = dict(title='MHT demo video', artist='Erik Liland',
+                        comment='pyMHT')
         fileWriter = animation.FFMpegWriter(fps=2, metadata=metadata, bitrate=1800)
         fig = plt.figure()
         ax = fig.gca()
-        fileWriter.setup(fig, "writer_test.mp4", 100)
+        fileWriter.setup(fig, "writer_test.mp4", 120)
     tic1 = time.time()
 
     def simulate(tracker, simList, scanList, minToc, maxToc, avgToc, **kwargs):
@@ -210,12 +210,12 @@ def runSimulation(**kwargs):
         # tracker.plotStatesFromRoot(dummy=False, real=False, ais=True)
         # tracker.plotMeasurementsFromTracks(labels = False, dummy = True, real = True)
         # tracker.plotLastScan(ax)
-        # tracker.plotAllScans()
-        # tracker.plotLastAisUpdate()
-        # tracker.plotAllAisUpdates()
+        # tracker.plotAllScans(ax)
+        # tracker.plotLastAisUpdate(ax)
+        tracker.plotAllAisUpdates(ax)
         # tracker.plotHypothesesTrack(colors=colors3, markStates=True)  # CAN BE SLOW!
         tracker.plotActiveTracks(ax, colors=colors2, markInitial=True, labelInitial=True, markRoot=False, markEnd=False,
-                                 markStates=False, real=True, dummy=True, ais=True, smooth=False, markID=False)
+                                 markStates=False, real=False, dummy=False, ais=True, smooth=False, markID=False)
         # tracker.plotActiveTracks(colors=colors2, markInitial=False, markRoot=False, markStates=False, real=False,
         #                          dummy=False, ais=False, smooth=True, markEnd=False)
         tracker.plotTerminatedTracks(ax, markStates=False, real=True, dummy=True, ais=True, markInitial=True, markID=False)
